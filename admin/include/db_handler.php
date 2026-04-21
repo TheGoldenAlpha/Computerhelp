@@ -7,27 +7,27 @@
  
 class db_utils {
 
-  var $db;
-  var $version;  
-  var $status;  // empty when ok, else contains an error message
-  var $db_lnk;  
-  var $db_host;
-  var $db_user;
-  var $db_pass;
-  var $ftp_host;
-  var $ftp_user;
-  var $ftp_pass;
-  var $ftp_path;
-  var $cur_table;
-  var $table_defs;
-  var $table_struct;
-  var $pictures;
-  var $backgrounds;
-  var $iconsDir;
-  var $sms_gw_u_p;
-  var $last_ins_call;
-  var $fields;
-  var $log;
+  public $db;
+  public $version;
+  public $status;  // empty when ok, else contains an error message
+  public $db_lnk;
+  public $db_host;
+  public $db_user;
+  public $db_pass;
+  public $ftp_host;
+  public $ftp_user;
+  public $ftp_pass;
+  public $ftp_path;
+  public $cur_table;
+  public $table_defs;
+  public $table_struct;
+  public $pictures;
+  public $backgrounds;
+  public $iconsDir;
+  public $sms_gw_u_p;
+  public $last_ins_call;
+  public $fields;
+  public $log;
     
   public function db_utils() {
     self::__construct();
@@ -2317,7 +2317,7 @@ class db_utils {
     $error = false;
     if($_SESSION['has_email']=="no") return true;  //simulate send OK
     $mail = new PHPMailer(true);  // create a new object
-    $mail->IsSMTP(); // enable SMTP
+    $mail->isSMTP(); // enable SMTP
     $mail->CharSet='UTF-8'; // enable SMTP
     $mail->SMTPDebug = 0;  // debugging: 1 = errors and messages, 2 = messages only
     $mail->SMTPAuth = true;  // authentication enabled
@@ -2326,13 +2326,13 @@ class db_utils {
     $mail->Port = 465; 
     $mail->Username = $_SESSION['CHMUSER'];  
     $mail->Password = $_SESSION['CHMPWD'];           
-    $error = !($mail->SetFrom($from, $from_name, 0));
+    $error = !($mail->setFrom($from, $from_name, 0));
     if (isset($replyto))
-      $mail->AddReplyTo($replyto,$replyto);
+      $mail->addReplyTo($replyto,$replyto);
     else
-      $mail->AddReplyTo($from,$from_name);
+      $mail->addReplyTo($from,$from_name);
     $mail->Subject = $subject;
-    $mail->IsHTML($HTML);
+    $mail->isHTML($HTML);
     $tmpBody = $body;
     if ($HTML) {
       $tmpBody = str_replace("\r\n", "<BR />", $tmpBody);
@@ -2342,9 +2342,9 @@ class db_utils {
     }
     $mail->Body = $tmpBody;
     if (!$error)
-      $error = !($mail->AddAddress($to));
+      $error = !($mail->addAddress($to));
     $error=false;
-    if($error || !$mail->Send()) {
+    if($error || !$mail->send()) {
       $error = 'Mail error: '.$mail->ErrorInfo; 
       return false;
     } else {

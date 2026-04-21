@@ -9,7 +9,7 @@
 */  
 class presentation extends db_utils{
   
-  var $searchvalue;
+  public $searchvalue;
   
     // 2/3/08-GC: add class parameter.
   function WriteCombo($vals, $name, $selected="", $first="", $class="",  $tabidx="", $OnFocusEvent="", $OnChangeEvent="", $OnBlurEvent=""){
@@ -27,7 +27,7 @@ class presentation extends db_utils{
     if (!empty($first)) {
      $res .= "<option value=''>$first</option>\n";
     }
-    while(list($val, $opt)=each($vals)){
+    foreach($vals as $val => $opt){
       $res .= "<option value=\"$val\"".
         ((($val==$selection) and !(is_numeric($val) and ($val==0) and ($selection=="")))?' selected':'').
         ">$opt</option>\n";
@@ -50,7 +50,7 @@ class presentation extends db_utils{
     $selection=$selected;
     else
     $selection="";
-    while(list($val, $opt)=each($vals)){
+    foreach($vals as $val => $opt){
       $res .= "<option value=\"$opt\"";
       if ($opt==$selection) $res .=' selected';
       $res .= ">$opt</option>\n";
@@ -80,7 +80,7 @@ class presentation extends db_utils{
     $myFields = (!is_array($fields)) ? explode(",",$fields) : $fields;
     $myLink = (!empty(trim($linked))) ? $linked : "0";
     if (sizeof($myFields)==0) {    //normal process when no fields
-      while(list($val, $opt)=each($vals)){
+      foreach($vals as $val => $opt){
         $res .= "<option value=\"$val\"".((($val==$selection) and !(is_numeric($val) and ($val==0) and ($selection=="")))?' selected':'').">";
         $res .= ">$opt</option>\n";
         }
@@ -110,7 +110,7 @@ class presentation extends db_utils{
             array_push($maxlen,$tmplen);
           }
         }
-        while(list($val, $opt)=each($vals)){
+        foreach($vals as $val => $opt){
           if (array_search($name,$myFields)) {  // when return value i in field list
             $selectionValue = $opt[$name];    // in two steps because  trim($opt[$name]) would return an empty string
             $selectionValue = trim($selectionValue);
@@ -160,7 +160,7 @@ class presentation extends db_utils{
     if (!empty($first)) {
      $res .= "<option value=''>$first</option>\n";
     }
-    while(list($val, $opt)=each($vals)){
+    foreach($vals as $val => $opt){
       $res .= "<option value=\"$val\"".
         ((($val==$selection) and !(is_numeric($val) and ($val==0) and ($selection=="")))?' selected':'').
         ">$opt</option>\n";
@@ -179,7 +179,7 @@ class presentation extends db_utils{
     $selection=$selected;
     else
     $selection="";
-    while(list($val, $opt)=each($vals)){
+    foreach($vals as $val => $opt){
       $res .= "<option value=\"$val\"".
         ((($val==$selection) and !(is_numeric($val) and ($val==0) and ($selection=="")))?' selected':'').
         ">$opt</option>\n";
@@ -219,8 +219,8 @@ class presentation extends db_utils{
     else
       $selection="";
     if (sizeof($fields)==0) {    //normal process when no fields
-      $res .= "<option value=\"$val\"".((($val==$selection) and !(is_numeric($val) and ($val==0) and ($selection=="")))?' selected':'').">";
-      while(list($val, $opt)=each($vals)){
+      foreach($vals as $val => $opt){
+        $res .= "<option value=\"$val\"".((($val==$selection) and !(is_numeric($val) and ($val==0) and ($selection=="")))?' selected':'').">";
         $res .= ">$opt</option>\n";
       }
     }
@@ -249,7 +249,7 @@ class presentation extends db_utils{
           array_push($maxlen,$tmplen);
         }
       }
-      while(list($val, $opt)=each($vals)){
+      foreach($vals as $val => $opt){
         if (array_search($name,$fields)) {  // when return value i in field list
           $selectionValue = $opt[$name];    // in two steps because  trim($opt[$name]) would return an empty string
           $selectionValue = trim($selectionValue);
@@ -1234,7 +1234,7 @@ class presentation extends db_utils{
           if($tournaments[$i]['final'] == 0){
             $NrSpecials++;
             $turnament_date= $this->format_date($tournaments[$i]['event_date'],"D, d.m.Y");
-            $name_value = ereg_replace(" ", "", $tournaments[$i]['location']);
+            $name_value = str_replace(" ", "", $tournaments[$i]['location']);
             $temp .= "<TR><TD class='text'><INPUT type=checkbox value=".$name_value." name=".$name_value." id='game".$i."'></TD><TD class='text'>".$turnament_date.": ".$tournaments[$i]['location']."</TD></TR>";
           }
           if($tournaments[$i]['final'] == 1){
@@ -1244,7 +1244,7 @@ class presentation extends db_utils{
               $final_displayed = true;
             }
             $turnament_date= $this->format_date($tournaments[$i]['event_date'],"D, d.m.Y");
-            $name_value = ereg_replace(" ", "", $tournaments[$i]['location']);
+            $name_value = str_replace(" ", "", $tournaments[$i]['location']);
             $temp .= "<TR><TD class='text'><INPUT type=checkbox value=".$name_value." name=".$name_value." id='game".$i."'></TD><TD class='text'>".$turnament_date.": ".$tournaments[$i]['location']."</TD></TR>";
           }
         }
@@ -1266,7 +1266,7 @@ class presentation extends db_utils{
     for ($i=0; $i<$num;$i++){
       $temp[$i]['location'] = $this->cleanEscaped($temp[$i]['location']);
       $temp[$i]['location'] = addslashes($temp[$i]['location']);
-      $gamename = ereg_replace(" ", "", $temp[$i]['location']);  //GC: 27apr12 because name doesn't content spaces
+      $gamename = str_replace(" ", "", $temp[$i]['location']);  //GC: 27apr12 because name doesn't content spaces
       if(isset($_REQUEST[$gamename])){
         $Tournament .= $this->format_date($temp[$i]['event_date']).": ".$temp[$i]['location']."<BR>";
       }
