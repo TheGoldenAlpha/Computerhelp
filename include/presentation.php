@@ -1009,7 +1009,7 @@ class presentation extends db_utils{
     $MainMenus = $_SESSION['mainmenu'];
     $SubMenus = $_SESSION['submenu'];
     $SubSubMenus = $_SESSION['subsubmenu'];
-    $ret= array('menuID'type'=>",'menuTXT'type'=>",'menuLNK'type'=>"); // to return "" when nothing found
+    $ret= array('menuID'=>'', 'menuTXT'=>'', 'menuLNK'=>''); // to return "" when nothing found
     for ($i=0;$i<sizeof($MainMenus);$i++)
       if ($MainMenus[$i] ["TITLE"]==strtolower($menuTitle)) {
         $ret['menuID']= $MainMenus[$i] ["MID"];
