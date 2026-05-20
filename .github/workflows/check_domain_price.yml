@@ -1,0 +1,27 @@
+name: Monthly Domain Price Check
+
+on:
+  schedule:
+    - cron: '0 9 1 * *'  # 1. jeden Monats um 09:00 UTC
+  workflow_dispatch:       # auch manuell startbar
+
+jobs:
+  check-price:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Check domain price
+        run: python check_price.py
