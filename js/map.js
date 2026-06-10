@@ -2,35 +2,46 @@
 
 // ============================================================================
 //  Karten-Seite: McDonald's anzeigen, abhaken, zurücksetzen + Animationen.
+//  Daten: Standorte live von Overpass (data.js), Besuche via Supabase (api.js).
 // ============================================================================
 
 const session = Session.get();
-if (!session) { location.href = '/'; }
 
 let MAP, MARKERS = new Map();   // ext_id -> { marker, mcd }
 let VISITED = new Set();
 let MCD_LIST = [];
-let CURRENT = { visitCount: 0, total: 0, rank: null };
+let CURRENT = { visitCount: 0, total: 0, info: getRankInfo(0) };
 let FILTER = 'all';
+
+// --- Lade-Overlay ----------------------------------------------------------
+function showLoading(text) {
+  let el = document.getElementById('map-loading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'map-loading';
+    el.innerHTML = `<div class="ml-box"><div class="ml-spin">🍔</div><div class="ml-text"></div></div>`;
+    document.body.appendChild(el);
+  }
+  el.querySelector('.ml-text').textContent = text || 'Lädt…';
+  el.style.display = 'flex';
+}
+function hideLoading() { const el = document.getElementById('map-loading'); if (el) el.style.display = 'none'; }
 
 // --- Marker-Icon ----------------------------------------------------------
 function makeIcon(visited) {
   return L.divIcon({
     className: 'mc-divicon',
-    html: `<div class="mc-marker ${visited ? 'visited' : ''}">
-             <span class="mc-m">M</span>
-             <span class="mc-check">✓</span>
-           </div>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
-    popupAnchor: [0, -18],
+    html: `<div class="mc-marker ${visited ? 'visited' : ''}"><span class="mc-m">M</span><span class="mc-check">✓</span></div>`,
+    iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18],
   });
 }
 
 function popupHtml(mcd) {
   const visited = VISITED.has(mcd.ext_id);
-  const addr = [mcd.street && `${mcd.street} ${mcd.housenumber || ''}`.trim(), [mcd.postcode, mcd.city].filter(Boolean).join(' ')]
-    .filter(Boolean).join(', ');
+  const addr = [
+    mcd.street && `${mcd.street} ${mcd.housenumber || ''}`.trim(),
+    [mcd.postcode, mcd.city].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ');
   return `
     <div class="mc-popup">
       <div class="mcp-title">${escapeHtml(mcd.name || "McDonald's")}</div>
@@ -43,27 +54,32 @@ function popupHtml(mcd) {
 
 // --- Status-Leiste oben ----------------------------------------------------
 function renderStatus() {
-  const r = CURRENT.rank;
+  const info = CURRENT.info;
   document.getElementById('group-name').textContent = session.name;
-  if (r) {
-    document.getElementById('rank-icon').textContent = r.icon;
-    document.getElementById('rank-name').textContent = r.name;
-    document.getElementById('rank-icon').title = r.subtitle || '';
-  }
+  document.getElementById('rank-icon').textContent = info.rank.icon;
+  document.getElementById('rank-icon').title = info.rank.subtitle || '';
+  document.getElementById('rank-name').textContent = info.rank.name;
   document.getElementById('stat-count').textContent = CURRENT.visitCount;
   document.getElementById('stat-total').textContent = '/ ' + CURRENT.total;
   const pct = CURRENT.total ? Math.round((CURRENT.visitCount / CURRENT.total) * 100) : 0;
   document.getElementById('stat-pct').textContent = `(${pct}%)`;
-  document.getElementById('progress-host').innerHTML = r ? progressHtml(CURRENT.visitCount, r) : '';
+  document.getElementById('progress-host').innerHTML = progressHtml(CURRENT.visitCount, info);
 }
 
-// --- Marker-Sichtbarkeit (Filter) -----------------------------------------
+function setCount(count) {
+  CURRENT.visitCount = count;
+  CURRENT.total = MCD_LIST.length;
+  CURRENT.info = getRankInfo(count);
+  renderStatus();
+}
+
+// --- Filter ---------------------------------------------------------------
 function applyFilter() {
   for (const [extId, { marker }] of MARKERS) {
     const v = VISITED.has(extId);
     const show = FILTER === 'all' || (FILTER === 'visited' && v) || (FILTER === 'open' && !v);
     if (show) { if (!MAP.hasLayer(marker)) marker.addTo(MAP); }
-    else { if (MAP.hasLayer(marker)) MAP.removeLayer(marker); }
+    else if (MAP.hasLayer(marker)) MAP.removeLayer(marker);
   }
 }
 
@@ -72,36 +88,32 @@ async function toggleVisit(extId) {
   const entry = MARKERS.get(extId);
   if (!entry) return;
   const visited = VISITED.has(extId);
+  const before = CURRENT.visitCount;
   try {
     if (!visited) {
-      const res = await api(`/api/groups/${session.id}/visits`, {
-        method: 'POST', token: session.token, body: { ext_id: extId },
-      });
+      const res = await API.addVisit(session.token, extId);
       VISITED.add(extId);
       entry.marker.setIcon(makeIcon(true));
-      CURRENT = { visitCount: res.visitCount, total: res.total, rank: res.rank };
+      const prevIdx = getRankInfo(before).index;
+      setCount(res.visit_count);
       celebrate(entry.marker);
-      if (res.rankUp) {
-        setTimeout(() => FX.rankUp(res.rank), 400);
-      }
+      if (CURRENT.info.index > prevIdx) setTimeout(() => FX.rankUp(CURRENT.info.rank), 400);
     } else {
-      const res = await api(`/api/groups/${session.id}/visits/${encodeURIComponent(extId)}`, {
-        method: 'DELETE', token: session.token,
-      });
+      const res = await API.removeVisit(session.token, extId);
       VISITED.delete(extId);
       entry.marker.setIcon(makeIcon(false));
-      CURRENT = { visitCount: res.visitCount, total: res.total, rank: res.rank };
+      const prevIdx = getRankInfo(before).index;
+      setCount(res.visit_count);
       FX.sound.undo();
       const p = markerPoint(entry.marker);
       FX.floatLabel('−1', p.x, p.y, 'minus');
-      if (res.rankDown) toast(`Zurückgestuft auf „${res.rank.name}“ ${res.rank.icon}`);
+      if (CURRENT.info.index < prevIdx) toast(`Zurückgestuft auf „${CURRENT.info.rank.name}" ${CURRENT.info.rank.icon}`);
     }
-    renderStatus();
     applyFilter();
     MAP.closePopup();
   } catch (ex) {
-    if (ex.status === 401) { toast('Sitzung abgelaufen – bitte neu einloggen.'); Session.clear(); setTimeout(() => location.href = '/', 800); }
-    else toast('Fehler: ' + ex.message, 'error');
+    if (ex.notConfigured) { toast('Supabase nicht konfiguriert.', 'error'); return; }
+    toast('Fehler: ' + ex.message, 'error');
   }
 }
 
@@ -139,8 +151,7 @@ function runSearch() {
   $results.classList.add('show');
   $results.querySelectorAll('.mcr-item').forEach((it) => {
     it.addEventListener('click', () => {
-      const ext = it.dataset.ext;
-      const entry = MARKERS.get(ext);
+      const entry = MARKERS.get(it.dataset.ext);
       if (entry) {
         if (!MAP.hasLayer(entry.marker)) entry.marker.addTo(MAP);
         MAP.flyTo(entry.marker.getLatLng(), 15, { duration: 0.8 });
@@ -152,9 +163,7 @@ function runSearch() {
   });
 }
 $search.addEventListener('input', runSearch);
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.map-search')) $results.classList.remove('show');
-});
+document.addEventListener('click', (e) => { if (!e.target.closest('.map-search')) $results.classList.remove('show'); });
 
 // --- Steuer-Buttons --------------------------------------------------------
 document.getElementById('filter').addEventListener('click', (e) => {
@@ -163,71 +172,35 @@ document.getElementById('filter').addEventListener('click', (e) => {
   document.querySelectorAll('#filter button').forEach((b) => b.classList.toggle('active', b === btn));
   applyFilter();
 });
-
-document.getElementById('btn-locate').addEventListener('click', () => {
-  MAP.locate({ setView: true, maxZoom: 13 });
-});
-
+document.getElementById('btn-locate').addEventListener('click', () => MAP.locate({ setView: true, maxZoom: 13 }));
 document.getElementById('btn-logout').addEventListener('click', () => {
-  Session.clear(); location.href = '/';
+  if (session && session.token) API.logout(session.token);
+  Session.clear(); location.href = 'index.html';
 });
+document.getElementById('btn-refresh').addEventListener('click', reloadLocations);
+document.getElementById('btn-ranks').addEventListener('click', showRanks);
 
 const $mute = document.getElementById('btn-mute');
 function refreshMute() { $mute.textContent = FX.isMuted() ? '🔇' : '🔊'; }
 $mute.addEventListener('click', () => { FX.toggleMute(); refreshMute(); });
 refreshMute();
 
-document.getElementById('btn-ranks').addEventListener('click', showRanks);
-
-async function showRanks() {
-  let ranks = [];
-  try { ranks = await api('/api/ranks'); } catch { /* egal */ }
-  const cur = CURRENT.rank ? CURRENT.rank.index : 0;
-  const html = `<div class="rank-list">` + ranks.map((r) => `
-    <div class="rank-row ${r.index === cur ? 'current' : ''} ${r.index < cur ? 'done' : ''}">
+function showRanks() {
+  const cur = CURRENT.info.index;
+  const html = `<div class="rank-list">` + RANKS.map((r, i) => `
+    <div class="rank-row ${i === cur ? 'current' : ''} ${i < cur ? 'done' : ''}">
       <span class="rr-icon">${r.icon}</span>
-      <span class="rr-info">
-        <span class="rr-name">${escapeHtml(r.name)}</span>
-        <span class="rr-sub muted">${escapeHtml(r.subtitle)}</span>
-      </span>
+      <span class="rr-info"><span class="rr-name">${escapeHtml(r.name)}</span>
+        <span class="rr-sub muted">${escapeHtml(r.subtitle)}</span></span>
       <span class="rr-min">ab ${r.minVisits}</span>
     </div>`).join('') + `</div>`;
   openModal({ title: '🏅 Alle Ränge', html });
 }
 
-// --- Initialisierung -------------------------------------------------------
-async function init() {
-  renderStatus();
-  MAP = L.map('map', { zoomControl: true, attributionControl: true }).setView([46.8, 8.23], 8);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap',
-  }).addTo(MAP);
-
-  MAP.on('locationerror', () => toast('Standort nicht verfügbar.', 'error'));
-  MAP.on('locationfound', (e) => {
-    L.circleMarker(e.latlng, { radius: 8, color: '#264653', fillColor: '#4895ef', fillOpacity: 0.9, weight: 2 })
-      .addTo(MAP).bindPopup('Du bist hier 📍').openPopup();
-  });
-
-  // Daten parallel laden
-  let mcdData, visitData;
-  try {
-    [mcdData, visitData] = await Promise.all([
-      api('/api/mcdonalds'),
-      api(`/api/groups/${session.id}/visits`, { token: session.token }),
-    ]);
-  } catch (ex) {
-    if (ex.status === 401) { Session.clear(); location.href = '/'; return; }
-    toast('Fehler beim Laden: ' + ex.message, 'error');
-    return;
-  }
-
-  MCD_LIST = mcdData.mcdonalds;
-  VISITED = new Set(visitData.visits);
-  CURRENT = { visitCount: visitData.visitCount, total: visitData.total, rank: visitData.rank };
-  renderStatus();
-
+// --- Marker bauen ----------------------------------------------------------
+function buildMarkers() {
+  for (const { marker } of MARKERS.values()) MAP.removeLayer(marker);
+  MARKERS.clear();
   for (const mcd of MCD_LIST) {
     const marker = L.marker([mcd.lat, mcd.lon], { icon: makeIcon(VISITED.has(mcd.ext_id)) });
     marker.bindPopup(() => popupHtml(mcd));
@@ -238,10 +211,58 @@ async function init() {
     marker.addTo(MAP);
     MARKERS.set(mcd.ext_id, { marker, mcd });
   }
+  applyFilter();
+}
 
-  if (MCD_LIST.length === 0) {
-    toast('Keine McDonald\'s in der DB – bitte "npm run seed" ausführen.', 'error');
+async function reloadLocations() {
+  showLoading('Aktualisiere Standorte von OpenStreetMap…');
+  try {
+    const { list, source } = await loadMcdonalds(showLoading, true);
+    MCD_LIST = list;
+    buildMarkers();
+    setCount(CURRENT.visitCount);
+    toast(source === 'overpass' ? `${list.length} McDonald's aktualisiert ✅` : `${list.length} Standorte (Fallback)`);
+  } catch (e) {
+    toast('Aktualisieren fehlgeschlagen: ' + e.message, 'error');
+  } finally { hideLoading(); }
+}
+
+// --- Initialisierung -------------------------------------------------------
+async function init() {
+  if (!session) { location.href = 'index.html'; return; }
+  if (!requireConfigOrWarn()) return;
+
+  renderStatus();
+  MAP = L.map('map', { zoomControl: true }).setView([46.8, 8.23], 8);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(MAP);
+  MAP.on('locationerror', () => toast('Standort nicht verfügbar.', 'error'));
+  MAP.on('locationfound', (e) => {
+    L.circleMarker(e.latlng, { radius: 8, color: '#264653', fillColor: '#4895ef', fillOpacity: 0.9, weight: 2 })
+      .addTo(MAP).bindPopup('Du bist hier 📍').openPopup();
+  });
+
+  showLoading("Lade alle McDonald's der Schweiz…");
+  let mcd, visitData;
+  try {
+    [mcd, visitData] = await Promise.all([
+      loadMcdonalds(showLoading),
+      API.getVisits(session.token),
+    ]);
+  } catch (ex) {
+    hideLoading();
+    if (ex.app || ex.status === 400) { toast('Sitzung abgelaufen – bitte neu einloggen.'); Session.clear(); setTimeout(() => location.href = 'index.html', 900); return; }
+    toast('Fehler beim Laden: ' + ex.message, 'error');
+    return;
   }
+
+  MCD_LIST = mcd.list;
+  VISITED = new Set(visitData.visits || []);
+  buildMarkers();
+  setCount(visitData.visit_count || VISITED.size);
+  hideLoading();
+
+  if (mcd.source === 'bundled') toast('OpenStreetMap nicht erreichbar – gebündelte Liste geladen.', 'error');
+  if (MCD_LIST.length === 0) toast('Keine McDonald\'s gefunden.', 'error');
 }
 
 init();

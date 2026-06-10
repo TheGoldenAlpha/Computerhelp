@@ -2,7 +2,6 @@
 
 // Die Ränge – von "extrem dünn" bis "beleidigend dick" 😄
 // minVisits = ab wie vielen abgehakten McDonald's dieser Rang gilt.
-// Die Liste MUSS aufsteigend nach minVisits sortiert sein.
 const RANKS = [
   { minVisits: 0,   name: 'Windhauch',                icon: '🌬️', subtitle: 'Noch nie zugebissen. Verdächtig gesund.' },
   { minVisits: 1,   name: 'Grashalm',                 icon: '🌱', subtitle: 'So dünn, dich weht der Föhn um.' },
@@ -23,23 +22,16 @@ const RANKS = [
   { minVisits: 170, name: 'McLegende – Endgegner',    icon: '👑', subtitle: 'Du HAST den Bogen raus. Und alles andere auch.' },
 ];
 
-// Gibt {index, rank, next} für eine Besuchszahl zurück.
-// next ist der nächste Rang (oder null, wenn schon ganz oben).
 function getRankInfo(visits) {
   let index = 0;
   for (let i = 0; i < RANKS.length; i++) {
-    if (visits >= RANKS[i].minVisits) index = i;
-    else break;
+    if (visits >= RANKS[i].minVisits) index = i; else break;
   }
   const rank = RANKS[index];
   const next = RANKS[index + 1] || null;
   return {
-    index,
-    rank,
-    next,
-    visits,
+    index, rank, next, visits,
     toNext: next ? next.minVisits - visits : 0,
+    current: rank.minVisits,
   };
 }
-
-module.exports = { RANKS, getRankInfo };

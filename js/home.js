@@ -7,12 +7,16 @@ const $groups = document.getElementById('groups');
 const $meta = document.getElementById('meta');
 const $search = document.getElementById('search');
 
-// --- Laden ----------------------------------------------------------------
 async function load() {
+  if (!requireConfigOrWarn()) {
+    $groups.innerHTML = `<div class="empty">Bitte zuerst <code>config.js</code> ausfüllen (siehe README).</div>`;
+    return;
+  }
   try {
-    const data = await api('/api/groups');
-    ALL_GROUPS = data.leaderboard; // bereits nach Anzahl sortiert
-    TOTAL = data.total;
+    const [groups, total] = await Promise.all([API.listGroups(''), mcdCountQuick()]);
+    // nach Besuchszahl sortiert (Leaderboard)
+    ALL_GROUPS = groups.slice().sort((a, b) => b.visit_count - a.visit_count);
+    TOTAL = total;
     $meta.textContent = `${ALL_GROUPS.length} Gruppen · ${TOTAL} McDonald's`;
     render();
   } catch (err) {
@@ -31,23 +35,20 @@ function render() {
 
   const medals = ['🥇', '🥈', '🥉'];
   $groups.innerHTML = list.map((g) => {
-    // Platzierung in der GESAMT-Rangliste (nicht der gefilterten)
+    const info = getRankInfo(g.visit_count);
     const place = ALL_GROUPS.indexOf(g);
     const medal = place < 3 ? medals[place] : `<span class="place">${place + 1}.</span>`;
-    const pct = TOTAL ? Math.round((g.visitCount / TOTAL) * 100) : 0;
+    const pct = TOTAL ? Math.round((g.visit_count / TOTAL) * 100) : 0;
     return `
       <button class="group-card" data-id="${g.id}" data-name="${escapeHtml(g.name)}">
         <div class="gc-rank">${medal}</div>
-        <div class="gc-icon" title="${escapeHtml(g.rank.name)}">${g.rank.icon}</div>
+        <div class="gc-icon" title="${escapeHtml(info.rank.name)}">${info.rank.icon}</div>
         <div class="gc-main">
           <div class="gc-name">${escapeHtml(g.name)}</div>
-          <div class="gc-rankname">${escapeHtml(g.rank.name)}</div>
+          <div class="gc-rankname">${escapeHtml(info.rank.name)}</div>
           <div class="progress slim"><div class="progress-bar" style="width:${pct}%"></div></div>
         </div>
-        <div class="gc-count">
-          <strong>${g.visitCount}</strong>
-          <span class="muted">/ ${TOTAL}</span>
-        </div>
+        <div class="gc-count"><strong>${g.visit_count}</strong><span class="muted">/ ${TOTAL}</span></div>
       </button>`;
   }).join('');
 
@@ -61,7 +62,7 @@ $search.addEventListener('input', render);
 // --- Login per Passwort ---------------------------------------------------
 function askPassword(id, name) {
   openModal({
-    title: `Einloggen als „${name}“`,
+    title: `Einloggen als „${name}"`,
     html: `
       <p class="muted">Gib das Passwort dieser Gruppe ein, um ihre Karte zu öffnen.</p>
       <form id="login-form">
@@ -69,7 +70,7 @@ function askPassword(id, name) {
         <div class="form-err" id="login-err"></div>
         <button class="btn btn-primary btn-block" type="submit">Karte öffnen 🗺️</button>
       </form>`,
-    onMount(body, close) {
+    onMount(body) {
       const form = body.querySelector('#login-form');
       const pw = body.querySelector('#pw');
       const err = body.querySelector('#login-err');
@@ -78,10 +79,10 @@ function askPassword(id, name) {
         e.preventDefault();
         err.textContent = '';
         try {
-          const data = await api(`/api/groups/${id}/login`, { method: 'POST', body: { password: pw.value } });
+          const data = await API.login(id, pw.value);
           Session.set({ id: data.id, name: data.name, token: data.token });
           FX.sound.pop();
-          location.href = '/map';
+          location.href = 'map.html';
         } catch (ex) {
           err.textContent = ex.message;
           pw.select();
@@ -93,22 +94,19 @@ function askPassword(id, name) {
 
 // --- Neue Gruppe ----------------------------------------------------------
 document.getElementById('btn-new').addEventListener('click', () => {
+  if (!requireConfigOrWarn()) return;
   openModal({
     title: 'Neue Gruppe erstellen',
     html: `
       <form id="new-form">
-        <label class="field">
-          <span>Gruppenname</span>
-          <input id="ng-name" class="input" type="text" maxlength="40" placeholder="z.B. Die Pommes-Piraten" />
-        </label>
-        <label class="field">
-          <span>Passwort</span>
-          <input id="ng-pw" class="input" type="password" placeholder="mind. 3 Zeichen" />
-        </label>
+        <label class="field"><span>Gruppenname</span>
+          <input id="ng-name" class="input" type="text" maxlength="40" placeholder="z.B. Die Pommes-Piraten" /></label>
+        <label class="field"><span>Passwort</span>
+          <input id="ng-pw" class="input" type="password" placeholder="mind. 3 Zeichen" /></label>
         <div class="form-err" id="ng-err"></div>
         <button class="btn btn-primary btn-block" type="submit">Los geht's! 🚀</button>
       </form>`,
-    onMount(body, close) {
+    onMount(body) {
       const form = body.querySelector('#new-form');
       const name = body.querySelector('#ng-name');
       const pw = body.querySelector('#ng-pw');
@@ -118,11 +116,11 @@ document.getElementById('btn-new').addEventListener('click', () => {
         e.preventDefault();
         err.textContent = '';
         try {
-          const data = await api('/api/groups', { method: 'POST', body: { name: name.value, password: pw.value } });
+          const data = await API.createGroup(name.value, pw.value);
           Session.set({ id: data.id, name: data.name, token: data.token });
           FX.confetti(120);
           FX.sound.fanfare();
-          setTimeout(() => { location.href = '/map'; }, 600);
+          setTimeout(() => { location.href = 'map.html'; }, 600);
         } catch (ex) {
           err.textContent = ex.message;
         }
@@ -144,8 +142,11 @@ function renderContinue() {
         <button class="btn btn-primary" id="goto-map">Zur Karte 🗺️</button>
       </div>
     </div>`;
-  box.querySelector('#goto-map').addEventListener('click', () => location.href = '/map');
-  box.querySelector('#logout').addEventListener('click', () => { Session.clear(); renderContinue(); toast('Abgemeldet.'); });
+  box.querySelector('#goto-map').addEventListener('click', () => location.href = 'map.html');
+  box.querySelector('#logout').addEventListener('click', () => {
+    if (s.token) API.logout(s.token);
+    Session.clear(); renderContinue(); toast('Abgemeldet.');
+  });
 }
 
 renderContinue();

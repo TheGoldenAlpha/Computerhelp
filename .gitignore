@@ -1,14 +1,8 @@
-# Abhängigkeiten
+# Node-Module (nur fürs optionale Tools-Script; nicht nötig fürs Deployment)
 node_modules/
-
-# SQLite-Datenbank (wird lokal erzeugt – nicht einchecken!)
-data/*.db
-data/*.db-shm
-data/*.db-wal
-
-# Umgebung
-.env
 
 # Logs / Diverses
 *.log
 .DS_Store
+
+# Hinweis: config.js wird BEWUSST eingecheckt (der anon-Key ist öffentlich).

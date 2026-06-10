@@ -1,37 +1,13 @@
 'use strict';
 
 // ============================================================================
-//  Gemeinsame Helfer: API-Aufrufe, Session, Modal, Toasts.
+//  UI-Helfer: HTML-Escaping, Toasts, Modal, Fortschrittsbalken.
 // ============================================================================
 
-const SESSION_KEY = 'mcsammler_session';
-
-const Session = {
-  get() {
-    try { return JSON.parse(localStorage.getItem(SESSION_KEY)); }
-    catch { return null; }
-  },
-  set(s) { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); },
-  clear() { localStorage.removeItem(SESSION_KEY); },
-};
-
-async function api(path, { method = 'GET', body, token } = {}) {
-  const headers = {};
-  if (body) headers['Content-Type'] = 'application/json';
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  let data = null;
-  try { data = await res.json(); } catch { /* leer */ }
-  if (!res.ok) {
-    const err = new Error((data && data.error) || `Fehler ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return data;
-}
-
 function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(s ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
 }
 
 // --- Toast ----------------------------------------------------------------
@@ -46,12 +22,11 @@ function toast(msg, type = 'info') {
   el.className = 'toast toast-' + type;
   el.textContent = msg;
   host.appendChild(el);
-  setTimeout(() => { el.classList.add('show'); }, 10);
+  setTimeout(() => el.classList.add('show'), 10);
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
 }
 
 // --- Modal ----------------------------------------------------------------
-// openModal({ title, html, onMount }) -> liefert {close, root}
 function openModal({ title, html, onMount }) {
   const back = document.createElement('div');
   back.className = 'modal-back';
@@ -75,19 +50,17 @@ function openModal({ title, html, onMount }) {
   return { close, root: back };
 }
 
-// Fortschrittsbalken-HTML für eine Rang-Info
-function progressHtml(visitCount, rank) {
-  const from = rank.current ?? 0;
-  const to = rank.next ? rank.next.minVisits : visitCount;
+// --- Fortschrittsbalken zur nächsten Rang-Stufe ---------------------------
+function progressHtml(visitCount, info) {
+  const from = info.current ?? 0;
+  const to = info.next ? info.next.minVisits : visitCount;
   const span = Math.max(1, to - from);
   const done = Math.min(span, visitCount - from);
-  const pct = rank.next ? Math.round((done / span) * 100) : 100;
-  const label = rank.next
-    ? `Noch ${rank.toNext} bis „${escapeHtml(rank.next.name)}“ ${rank.next.icon}`
+  const pct = info.next ? Math.round((done / span) * 100) : 100;
+  const label = info.next
+    ? `Noch ${info.toNext} bis „${escapeHtml(info.next.name)}" ${info.next.icon}`
     : 'Maximaler Rang erreicht! 👑';
   return `
-    <div class="progress" title="${pct}%">
-      <div class="progress-bar" style="width:${pct}%"></div>
-    </div>
+    <div class="progress" title="${pct}%"><div class="progress-bar" style="width:${pct}%"></div></div>
     <div class="progress-label">${label}</div>`;
 }
