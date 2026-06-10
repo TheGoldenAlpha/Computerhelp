@@ -1,0 +1,14 @@
+# Abhängigkeiten
+node_modules/
+
+# SQLite-Datenbank (wird lokal erzeugt – nicht einchecken!)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Umgebung
+.env
+
+# Logs / Diverses
+*.log
+.DS_Store

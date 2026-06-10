@@ -1,0 +1,23 @@
+{
+  "name": "mcsammler",
+  "version": "1.0.0",
+  "description": "McSammler – sammle alle McDonald's der Schweiz mit deinen Kollegen",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node src/seed.js",
+    "seed:fresh": "node src/seed.js --fresh"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.1",
+    "express": "^4.21.2",
+    "leaflet": "^1.9.4"
+  },
+  "license": "MIT"
+}

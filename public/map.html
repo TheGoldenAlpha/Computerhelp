@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>McSammler 🍔 – Karte</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍔</text></svg>" />
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="mapview">
+  <div id="topbar">
+    <div class="tb-left">
+      <a href="/" class="tb-home" title="Startseite">🍔</a>
+      <div class="rank-badge">
+        <div class="rb-icon" id="rank-icon">⏳</div>
+        <div class="rb-text">
+          <div class="rb-group" id="group-name">…</div>
+          <div class="rb-rank" id="rank-name">…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tb-center">
+      <div class="stat"><strong id="stat-count">0</strong><span id="stat-total">/ 0</span> abgehakt <span id="stat-pct" class="muted"></span></div>
+      <div id="progress-host"></div>
+    </div>
+
+    <div class="tb-right">
+      <div class="filter" id="filter">
+        <button data-f="all" class="active">Alle</button>
+        <button data-f="visited">Besucht</button>
+        <button data-f="open">Offen</button>
+      </div>
+      <button class="iconbtn" id="btn-ranks" title="Alle Ränge anzeigen">🏅</button>
+      <button class="iconbtn" id="btn-locate" title="Mein Standort">📍</button>
+      <button class="iconbtn" id="btn-mute" title="Ton an/aus">🔊</button>
+      <button class="iconbtn" id="btn-logout" title="Abmelden">🚪</button>
+    </div>
+  </div>
+
+  <div class="map-search">
+    <input id="mc-search" type="search" placeholder="🔍 McDonald's / Ort suchen…" autocomplete="off" />
+    <div id="mc-results" class="mc-results"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/js/fx.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/map.js"></script>
+</body>
+</html>

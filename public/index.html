@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>McSammler 🍔 – Sammle alle McDonald's der Schweiz</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍔</text></svg>" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="home">
+  <header class="hero">
+    <h1 class="logo">🍔 McSammler</h1>
+    <p class="tagline">Hak jeden McDonald's der Schweiz ab. Wer sammelt am meisten?</p>
+  </header>
+
+  <main class="container">
+    <div class="toolbar">
+      <button id="btn-new" class="btn btn-primary btn-big">➕ Neue Gruppe</button>
+      <div class="search-wrap">
+        <input id="search" class="search" type="search" placeholder="🔍 Gruppe suchen…" autocomplete="off" />
+      </div>
+    </div>
+
+    <div id="continue-box"></div>
+
+    <section>
+      <div class="section-head">
+        <h2>🏆 Rangliste</h2>
+        <span id="meta" class="muted"></span>
+      </div>
+      <div id="groups" class="group-list">
+        <div class="empty">Lade Gruppen…</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Selbstgebaut mit 🍟 &nbsp;·&nbsp; Standortdaten von OpenStreetMap</span>
+  </footer>
+
+  <script src="/js/fx.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>
