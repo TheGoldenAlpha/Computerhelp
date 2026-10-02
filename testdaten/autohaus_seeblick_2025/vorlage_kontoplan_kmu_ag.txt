@@ -1,0 +1,160 @@
+1	Aktiven	S	1	AK
+10	Umlaufvermögen	S	1	AK
+100	Flüssige Mittel	S	1	AK
+1000	Kasse	S	1	AK
+1020	Bankguthaben	S	1	AK
+106	Kurzfristig gehaltene Aktiven mit Börsenkurs	S	1	AK
+1060	Wertschriften	S	1	AK
+1069	Wertberichtigungen Wertschriften	H	1	AK
+110	Forderungen aus Lieferungen und Leistungen	S	1	AK
+1100	Forderungen aus Lieferungen und Leistungen (Debitoren)	S	1	AK
+1109	Delkredere	H	1	AK
+114	Übrige kurzfristige Forderungen	S	1	AK
+1140	Vorschüsse und Darlehen	S	1	AK
+1149	Wertberichtigungen Vorschüsse und Darlehen	H	1	AK
+1170	Vorsteuer MWST Material, Waren, Dienstleistungen, Energie	S	1	AK	SM
+1171	Vorsteuer MWST Investitionen, übriger Betriebsaufwand	S	1	AK	SI
+1176	Verrechnungssteuer	S	1	AK
+1180	Forderungen gegenüber Sozialversicherungen und Vorsorgeeinrichtungen	S	1	AK
+1189	Quellensteuer	S	1	AK
+1190	Sonstige kurzfristige Forderungen	S	1	AK
+1199	Wertberichtigungen sonstige kurzfristige Forderungen	H	1	AK
+120	Vorräte und nicht fakturierte Dienstleistungen	S	1	AK
+1200	Handelswaren	S	1	AK
+1210	Rohstoffe	S	1	AK
+1220	Werkstoffe	S	1	AK
+1230	Hilfs- und Verbrauchsmaterial	S	1	AK
+1250	Handelswaren in Konsignation	S	1	AK
+1260	Fertige Erzeugnisse	S	1	AK
+1270	Unfertige Erzeugnisse	S	1	AK
+1280	Nicht fakturierte Dienstleistungen	S	1	AK
+130	Aktive Rechnungsabgrenzungen	S	1	AK
+1300	Bezahlter Aufwand des Folgejahres	S	1	AK
+1301	Noch nicht erhaltener Ertrag	S	1	AK
+14	Anlagevermögen	S	1	AK
+140	Finanzanlagen	S	1	AK
+1400	Wertschriften	S	1	AK
+1409	Wertberichtigungen Wertschriften	H	1	AK
+1440	Darlehen	S	1	AK
+1441	Hypotheken	S	1	AK
+1449	Wertberichtigungen langfristige Forderungen	H	1	AK
+148	Beteiligungen	S	1	AK
+1480	Beteiligungen	S	1	AK
+1489	Wertberichtigungen Beteiligungen	H	1	AK
+150	Mobile Sachanlagen	S	1	AK
+1500	Maschinen und Apparate	S	1	AK	IN
+1509	Wertberichtigungen Maschinen und Apparate	H	1	AK
+1510	Mobiliar und Einrichtungen	S	1	AK	IN
+1519	Wertberichtigungen Mobiliar und Einrichtungen	H	1	AK
+1520	Büromaschinen, Informatik, Kommunikationstechnologie	S	1	AK	IN
+1529	Wertberichtigungen Büromaschinen, Informatik, Kommunikationstechnologie	H	1	AK
+1530	Fahrzeuge	S	1	AK	IN
+1539	Wertberichtigungen Fahrzeuge	H	1	AK
+1540	Werkzeuge und Geräte	S	1	AK	IN
+1549	Wertberichtigungen Werkzeuge und Geräte	H	1	AK
+160	Immobile Sachanlagen	S	1	AK
+1600	Geschäftsliegenschaften	S	1	AK
+1609	Wertberichtigungen Geschäftsliegenschaften	H	1	AK
+170	Immaterielle Werte	S	1	AK
+1700	Patente, Know-how, Lizenzen, Rechte, Entwicklungen	S	1	AK
+1709	Wertberichtigungen Patente, Know-how, Lizenzen, Rechte, Entwicklungen	H	1	AK
+1770	Goodwill	S	1	AK
+1779	Wertberichtigungen Goodwill	H	1	AK
+180	Nicht einbezahltes Grund-, Gesellschafter- oder Stiftungskapital	S	1	AK
+1850	Nicht einbezahltes Aktienkapital	S	1	AK
+2	Passiven	H	1	PA
+20	Kurzfristiges Fremdkapital	H	1	PA
+200	Verbindlichkeiten aus Lieferungen und Leistungen	H	1	PA
+2000	Verbindlichkeiten aus Lieferungen und Leistungen (Kreditoren)	H	1	PA
+2030	Erhaltene Anzahlungen	H	1	PA
+210	Kurzfristige verzinsliche Verbindlichkeiten	H	1	PA
+2100	Bankverbindlichkeiten	H	1	PA
+2120	Verbindlichkeiten aus Finanzierungsleasing	H	1	PA
+2140	Übrige verzinsliche Verbindlichkeiten	H	1	PA
+220	Übrige kurzfristige Verbindlichkeiten	H	1	PA
+2200	Geschuldete MWST (Umsatzsteuer)	H	1	PA	SV
+2201	Abrechnungskonto MWST	H	1	PA
+2206	Verrechnungssteuer	H	1	PA
+2208	Direkte Steuern	H	1	PA
+2210	Sonstige kurzfristige Verbindlichkeiten	H	1	PA
+2261	Beschlossene Ausschüttungen	H	1	PA
+2270	Sozialversicherungen und Vorsorgeeinrichtungen	H	1	PA
+2279	Quellensteuer	H	1	PA
+230	Passive Rechnungsabgrenzungen und kurzfristige Rückstellungen	H	1	PA
+2300	Noch nicht bezahlter Aufwand	H	1	PA
+2301	Erhaltener Ertrag des Folgejahres	H	1	PA
+2330	Kurzfristige Rückstellungen	H	1	PA
+24	Langfristiges Fremdkapital	H	1	PA
+240	Langfristige verzinsliche Verbindlichkeiten	H	1	PA
+2400	Bankverbindlichkeiten	H	1	PA
+2420	Verbindlichkeiten aus Finanzierungsleasing	H	1	PA
+2430	Obligationenanleihen	H	1	PA
+2450	Darlehen	H	1	PA
+2451	Hypotheken	H	1	PA
+250	Übrige langfristige Verbindlichkeiten	H	1	PA
+2500	Übrige langfristige Verbindlichkeiten (unverzinslich)	H	1	PA
+260	Rückstellungen sowie vom Gesetz vorgesehene ähnliche Positionen	H	1	PA
+2600	Rückstellungen	H	1	PA
+28	Eigenkapital (juristische Personen)	H	1	PA
+280	Grund-, Gesellschafter- oder Stiftungskapital	H	1	PA
+2800	Aktienkapital	H	1	PA
+290	Reserven und Jahresgewinn oder Jahresverlust	H	1	PA
+2900	Gesetzliche Kapitalreserve	H	1	PA
+2930	Reserve für eigene Kapitalanteile	H	1	PA
+2940	Aufwertungsreserve	H	1	PA
+2950	Gesetzliche Gewinnreserve	H	1	PA
+2960	Freiwillige Gewinnreserven	H	1	PA
+2970	Gewinnvortrag oder Verlustvortrag	H	1	PA
+2979	Jahresgewinn oder Jahresverlust	H	1	PA
+2980	Eigene Aktien, Stammanteile oder Anteilscheine (Minusposten)	S	1	PA
+3	Betrieblicher Ertrag aus Lieferungen und Leistungen	H	0	ER
+3000	Produktionserlöse	H	0	ER	VN
+3200	Handelserlöse	H	0	ER	VN
+3400	Dienstleistungserlöse	H	0	ER	VN
+3600	Übrige Erlöse aus Lieferungen und Leistungen	H	0	ER	VN
+3700	Eigenleistungen	H	0	ER
+3710	Eigenverbrauch	H	0	ER
+3800	Erlösminderungen	S	0	AU
+3805	Verluste Forderungen (Debitoren), Veränderung Delkredere	S	0	AU
+3900	Bestandesänderungen unfertige Erzeugnisse	H	0	ER
+3901	Bestandesänderungen fertige Erzeugnisse	H	0	ER
+3940	Bestandesänderungen nicht fakturierte Dienstleistungen	H	0	ER
+4	Aufwand für Material, Handelswaren, Dienstleistungen und Energie	S	0	AU
+4000	Materialaufwand Produktion	S	0	AU	MN
+4200	Handelswarenaufwand	S	0	AU	MN
+4400	Aufwand für bezogene Dienstleistungen	S	0	AU	MN
+4500	Energieaufwand zur Leistungserstellung	S	0	AU	MN
+4900	Aufwandminderungen	H	0	ER
+5	Personalaufwand	S	0	AU
+5000	Lohnaufwand	S	0	AU
+5700	Sozialversicherungsaufwand	S	0	AU
+5800	Übriger Personalaufwand	S	0	AU
+5900	Leistungen Dritter	S	0	AU
+6	Übriger betrieblicher Aufwand, Abschreibungen und Wertberichtigungen sowie Finanzergebnis	S	0	AU
+6000	Raumaufwand	S	0	AU
+6100	Unterhalt, Reparaturen, Ersatz mobile Sachanlagen	S	0	AU	IN
+6105	Leasingaufwand mobile Sachanlagen	S	0	AU	IN
+6200	Fahrzeug- und Transportaufwand	S	0	AU	IN
+6260	Fahrzeugleasing und -mieten	S	0	AU	IN
+6300	Sachversicherungen, Abgaben, Gebühren, Bewilligungen	S	0	AU
+6400	Energie- und Entsorgungsaufwand	S	0	AU	IN
+6500	Verwaltungsaufwand	S	0	AU	IN
+6570	Informatikaufwand inkl. Leasing	S	0	AU	IN
+6600	Werbeaufwand	S	0	AU	IN
+6700	Sonstiger betrieblicher Aufwand	S	0	AU	IN
+6800	Abschreibungen und Wertberichtigungen auf Positionen des Anlagevermögens	S	0	AU
+6900	Finanzaufwand	S	0	AU
+6950	Finanzertrag	H	0	ER
+7	Betrieblicher Nebenerfolg	H	0	ER
+7000	Ertrag Nebenbetrieb	H	0	ER	VN
+7010	Aufwand Nebenbetrieb	S	0	AU	IN
+7500	Ertrag betriebliche Liegenschaft	H	0	ER
+7510	Aufwand betriebliche Liegenschaft	S	0	AU
+8	Betriebsfremder, ausserordentlicher, einmaliger oder periodenfremder Aufwand und Ertrag	S	0	AU
+8000	Betriebsfremder Aufwand	S	0	AU
+8100	Betriebsfremder Ertrag	H	0	ER
+8500	Ausserordentlicher, einmaliger oder periodenfremder Aufwand	S	0	AU
+8510	Ausserordentlicher, einmaliger oder periodenfremder Ertrag	H	0	ER
+8900	Direkte Steuern	S	0	AU
+9	Abschluss	H	0	ER
+9200	Jahresgewinn oder Jahresverlust	H	0	ER
