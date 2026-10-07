@@ -1,1 +1,55 @@
 # Computerhelp
+
+## GoBattle-Scan (`alpha_scan.py`)
+
+Sucht alle GoBattle-Spieler mit einem Namen nach dem Muster "The ... Alpha".
+Das Script braucht nur Python und Git, es muss nichts installiert werden.
+
+### Starten
+
+```
+python alpha_scan.py
+```
+
+Das Script macht alles selbst:
+
+1. Beim Start holt es mit `git pull` den neuesten Stand und macht bei der letzten gespeicherten ID weiter.
+2. Nach jedem kleinen Stück (20 IDs) speichert es die letzte fertige ID in eine Datei.
+3. Alle 30 Sekunden sichert es den Ordner `scan` per Git (`commit`, `pull`, `push`).
+
+Wenn du aufhörst (Strg+C, Neustart, Stromausfall), startest du es einfach wieder, auch auf einem anderen Rechner.
+Bei einem Stromausfall gehen höchstens die IDs der letzten 30 Sekunden verloren, die werden dann nochmal geprüft.
+
+### Was im Ordner `scan` liegt
+
+Pro Bereich gibt es einen Satz Dateien. Der Bereich steht im Dateinamen, z. B. `1-700000`.
+
+| Datei | Inhalt |
+|---|---|
+| `progress_1-700000.txt` | die letzte fertig geprüfte ID |
+| `log_1-700000.txt` | alles, was auch in der Shell steht, mit Uhrzeit |
+| `alpha_users_1-700000.csv` | die Treffer (ID, Name, Profil-Link) |
+| `failed_1-700000.txt` | IDs, die nicht abgefragt werden konnten (nur wenn es welche gab) |
+
+### Auf mehreren Rechnern gleichzeitig (z. B. Firma und zuhause)
+
+Jeder Rechner bekommt einen eigenen Bereich, sonst prüfen beide dieselben IDs:
+
+```
+# zuhause
+python alpha_scan.py --start 1 --end 350000
+
+# in der Firma
+python alpha_scan.py --start 350001 --end 700000
+```
+
+Das Rate-Limit von GoBattle gilt pro IP-Adresse. Jeder Rechner hält sich einzeln daran (2 parallele Anfragen, Pause bei jedem 503).
+
+### Weitere Optionen
+
+| Option | Wirkung |
+|---|---|
+| `--test 12345` | nur eine ID abfragen und die Antwort zeigen |
+| `--strict` | nur Namen, die mit "The" beginnen und mit "Alpha" enden |
+| `--no-git` | nichts per Git holen oder sichern, nur lokal speichern |
+| `--status-interval 60` | Status und Git-Sicherung alle 60 statt 30 Sekunden |
