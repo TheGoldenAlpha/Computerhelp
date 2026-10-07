@@ -120,3 +120,5 @@
 [2026-10-07 15:51:18] Setze fort ab ID 12980 (letzte gespeicherte ID: 12979)
 [2026-10-07 15:51:18] Scanne 687'021 IDs ab 12980 mit 2 parallelen Anfragen (Platzhalter-Abstand 1.4s), Status und Git-Sicherung alle 20 Sekunden
 [2026-10-07 15:51:38] [STATUS] bis ID 12'979 | 13/687'021 (0.0%) | 0.65 IDs/s (Schnitt 0.65) | Laufzeit 0m 20s | Rest ca. 293h 45m | User: 2 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x2 404x11 | Git: -
+[2026-10-07 15:51:58] [STATUS] bis ID 12'999 | 24/687'021 (0.0%) | 0.55 IDs/s (Schnitt 0.60) | Laufzeit 0m 40s | Rest ca. 318h 15m | User: 5 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x5 404x19 | Git: gesichert
+[2026-10-07 15:52:18] [STATUS] bis ID 12'999 | 39/687'021 (0.0%) | 0.75 IDs/s (Schnitt 0.65) | Laufzeit 1m 00s | Rest ca. 293h 46m | User: 8 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x8 404x31 | Git: gesichert
