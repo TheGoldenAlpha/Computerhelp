@@ -13,7 +13,7 @@ Nur Python-Standardbibliothek, keine Installation noetig.
 Beispiele:
     python3 gb_alpha_scan.py                       # IDs 1..700000, 200 parallele Requests
     python3 gb_alpha_scan.py --workers 100         # weniger parallel, falls Rate-Limits kommen
-    python3 gb_alpha_scan.py --status-every 10000  # Statusmeldung alle 10k statt 25k IDs
+    python3 gb_alpha_scan.py --status-every 10000  # nach 10k alle 10k statt alle 25k IDs Status
     python3 gb_alpha_scan.py --start 1 --end 50000 # Teilbereich
     python3 gb_alpha_scan.py --strict              # nur Name beginnt mit "The" und endet mit "Alpha"
 
@@ -129,7 +129,7 @@ def main():
     p.add_argument("--start", type=int, default=1)
     p.add_argument("--end", type=int, default=700_000)
     p.add_argument("--workers", type=int, default=200, help="parallele Requests (Standard: 200)")
-    p.add_argument("--status-every", type=int, default=25_000, help="Statusmeldung alle N IDs (Standard: 25000)")
+    p.add_argument("--status-every", type=int, default=25_000, help="Status nach 100, 1000, 10000 IDs, danach alle N IDs (Standard: 25000)")
     p.add_argument("--out", default="alpha_users.csv")
     p.add_argument("--strict", action="store_true", help="nur 'The ... Alpha' ohne etwas davor/danach")
     p.add_argument("--timeout", type=float, default=15)
@@ -163,10 +163,20 @@ def main():
     stats = {"found": 0, "errors": 0, "exists": 0}
     t0 = time.time()
     total = args.end - start + 1
-    next_status = start - 1 + args.status_every
+    # Status nach 100, 1k, 10k gescannten IDs, danach alle --status-every (25k, 50k, 75k, ...)
+    def milestones():
+        yield from (100, 1_000, 10_000)
+        n = args.status_every
+        while True:
+            if n > 10_000:
+                yield n
+            n += args.status_every
+
+    ms = milestones()
+    next_status = start - 1 + next(ms)
 
     print(f"Scanne IDs {start}..{args.end} mit {args.workers} parallelen Requests, "
-          f"Status alle {args.status_every} IDs")
+          f"Status nach 100, 1000, 10000 und danach alle {args.status_every} IDs")
 
     def check(member_id):
         try:
@@ -199,8 +209,10 @@ def main():
     last_done = start - 1
     try:
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            for chunk_start in range(start, args.end + 1, args.chunk):
-                chunk_end = min(chunk_start + args.chunk - 1, args.end)
+            chunk_start = start
+            while chunk_start <= args.end:
+                # Block endet spaetestens beim naechsten Status-Punkt, damit der Status puenktlich kommt
+                chunk_end = min(chunk_start + args.chunk - 1, args.end, next_status)
                 hits = [h for h in pool.map(check, range(chunk_start, chunk_end + 1)) if h]
                 for member_id, name in hits:
                     writer.writerow([member_id, name, PROFILE_URL.format(id=member_id)])
@@ -210,10 +222,11 @@ def main():
                 with open(progress_file, "w") as f:
                     f.write(str(chunk_end))
                 last_done = chunk_end
+                chunk_start = chunk_end + 1
 
-                while chunk_end >= next_status:
+                if chunk_end >= next_status and chunk_end < args.end:
                     status(chunk_end)
-                    next_status += args.status_every
+                    next_status = start - 1 + next(ms)
     except KeyboardInterrupt:
         print(f"\nAbgebrochen bei ID {last_done} – Fortschritt gespeichert, "
               f"einfach denselben Befehl nochmal starten zum Fortsetzen.")
