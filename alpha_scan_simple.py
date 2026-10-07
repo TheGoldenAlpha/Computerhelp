@@ -423,6 +423,9 @@ def main():
                    help="IDs pro Stück; nach jedem Stück wird der Fortschritt gespeichert (Standard: 20)")
     p.add_argument("--status-interval", type=float, default=30,
                    help="Status und Git-Sicherung alle N Sekunden (Standard: 30)")
+    p.add_argument("--max-minutes", type=float, default=0,
+                   help="nach so vielen Minuten sauber aufhören (Fortschritt wird gespeichert und gesichert). "
+                        "0 = unbegrenzt (Standard). Praktisch zum Testen verschiedener --delay-Werte.")
     p.add_argument("--strict", action="store_true", help="nur 'The ... Alpha' ohne etwas davor/danach")
     p.add_argument("--retry-failed", action="store_true",
                    help="nur die IDs aus scan/failed_<Bereich>.txt nochmal prüfen (Fortschritt bleibt unverändert)")
@@ -589,6 +592,9 @@ def main():
                 if time.time() - last_sync >= args.status_interval:
                     do_sync("laufend")
                     last_sync = time.time()
+                if args.max_minutes and time.time() - t0 >= args.max_minutes * 60:
+                    log(f"[i] --max-minutes {args.max_minutes:g} erreicht, höre sauber auf.")
+                    break
     except KeyboardInterrupt:
         log(f"Abgebrochen bei ID {saved_up_to['id']} - Fortschritt ist gespeichert, "
             f"einfach denselben Befehl nochmal starten zum Fortsetzen.")
