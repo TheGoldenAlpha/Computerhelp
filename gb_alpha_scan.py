@@ -53,6 +53,7 @@ _local = threading.local()
 _pause_lock = threading.Lock()
 _pause_until = 0.0
 _rate_limited = 0
+_net_retries = 0  # Timeouts / abgebrochene Verbindungen, die wiederholt werden
 
 
 class Limiter:
@@ -99,8 +100,31 @@ limiter = None  # wird in main() gesetzt
 def _pause_all(seconds):
     global _pause_until, _rate_limited
     with _pause_lock:
-        _pause_until = max(_pause_until, time.time() + seconds)
+        new_until = time.time() + seconds
+        if seconds >= 5 and new_until > _pause_until + 1:
+            sys.stdout.write(f"[i] Rate-Limit: GameBanana verlangt {seconds:g}s Pause, alle Requests warten\n")
+        _pause_until = max(_pause_until, new_until)
         _rate_limited += 1
+
+
+_first_429_seen = threading.Event()
+
+
+def _report_first_429(resp):
+    """Beim ersten 429 einmal zeigen, was GameBanana zum Limit sagt (hilft beim Einstellen)."""
+    if _first_429_seen.is_set():
+        return
+    _first_429_seen.set()
+    info = [f"{k}: {v}" for k, v in resp.getheaders()
+            if k.lower() == "retry-after" or "ratelimit" in k.lower() or "rate-limit" in k.lower()]
+    sys.stdout.write("[i] Erstes Rate-Limit (429). Header vom Server: "
+                     + (", ".join(info) or "keine Limit-Angaben") + "\n")
+
+
+def _count_net_retry():
+    global _net_retries
+    with _pause_lock:
+        _net_retries += 1
 
 
 def _wait_if_paused():
@@ -152,6 +176,8 @@ def fetch_name(member_id, timeout, max_retries):
                 # Rate-Limits zaehlen nicht als Fehlversuch, nur mit grosszuegiger Obergrenze
                 limiter.rate_limited()
                 retry_after = resp.getheader("Retry-After")
+                _report_first_429(resp)
+                _reset_conn()  # nach 429 frische Verbindung, falls der Server die alte haengen laesst
                 _pause_all(float(retry_after) if retry_after and retry_after.isdigit() else 1.0)
                 rate_limit_retries += 1
                 if rate_limit_retries > 50:
@@ -171,6 +197,7 @@ def fetch_name(member_id, timeout, max_retries):
             return None
         except (http.client.HTTPException, OSError, json.JSONDecodeError):
             _reset_conn()
+            _count_net_retry()
             if attempt < max_retries:
                 attempt += 1
                 time.sleep(delay)
@@ -264,11 +291,14 @@ def main():
         eta = (total - done) / rate if rate > 0 else float("inf")
         eta_txt = fmt_duration(eta) if eta != float("inf") else "?"
         label = "FERTIG" if final else "STATUS"
+        pause_left = _pause_until - now
+        pause_txt = f" | PAUSE noch {pause_left:.0f}s" if pause_left > 0 else ""
         print(f"[{label}] {start - 1 + done:,}/{args.end:,} ({done / total:.1%}) | "
-              f"{rate:.0f} IDs/s (Schnitt {avg:.0f}) | Parallel: {int(limiter.limit)} | "
+              f"{rate:.0f} IDs/s (Schnitt {avg:.0f}) | Parallel: {limiter.active}/{int(limiter.limit)} | "
               f"Laufzeit {fmt_duration(elapsed)} | Rest ca. {eta_txt} | "
               f"User: {stats['exists']:,} | Treffer: {stats['found']} | "
-              f"Fehler: {stats['errors']} | Rate-Limits: {_rate_limited}".replace(",", "'"),
+              f"Fehler: {stats['errors']} | Rate-Limits: {_rate_limited} | "
+              f"Timeouts/Verbindungsfehler: {_net_retries}{pause_txt}".replace(",", "'"),
               flush=True)
 
     stop_status = threading.Event()
