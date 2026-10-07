@@ -156,3 +156,7 @@
 [2026-10-07 15:57:21] [!] ID 13164 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
 [2026-10-07 15:57:21] [!] ID 13169 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
 [2026-10-07 15:57:21] [!] ID 13174 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-07 15:57:38] [STATUS] bis ID 13'179 | 49/686'861 (0.0%) | 0.55 IDs/s (Schnitt 0.61) | Laufzeit 1m 20s | Rest ca. 311h 40m | User: 13 | Treffer: 0 | Fehler: 5 | Rate-Limits (503): 25 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x13 404x31 503x25 | Git: gesichert
+[2026-10-07 15:57:54] [!] ID 13185 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-07 15:57:54] [!] ID 13190 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-07 15:57:54] [!] ID 13195 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
