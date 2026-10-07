@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Scannt GameBanana-Member-IDs und sucht alle User, deren Name dem Muster
-"The ... Alpha" entspricht, z. B.:
+Scannt GoBattle-User-IDs ueber eine JSON-API und sucht alle User, deren Name
+dem Muster "The ... Alpha" entspricht, z. B.:
 
     The Golden Alpha
     xX The Golden Alpha Xx
@@ -10,15 +10,21 @@ Scannt GameBanana-Member-IDs und sucht alle User, deren Name dem Muster
 Treffer landen in einer CSV-Datei (id, name, profil-url).
 Nur Python-Standardbibliothek, keine Installation noetig.
 
-Beispiele:
-    python3 gb_alpha_scan.py                       # IDs 1..700000, bis zu 200 parallele Requests
-    python3 gb_alpha_scan.py --workers 100         # hoechstens 100 parallel
-    python3 gb_alpha_scan.py --status-interval 10  # Status alle 10 statt 30 Sekunden
+Die API-URL wird mit --url angegeben, {id} wird durch die User-ID ersetzt.
+Zuerst mit --test pruefen, ob die URL stimmt und der Name gefunden wird:
+
+    python gb_alpha_scan.py --url "https://beispiel.org/api/user/{id}" --test 12345
+
+Dann der richtige Lauf:
+    python gb_alpha_scan.py --url "https://beispiel.org/api/user/{id}"
+    python gb_alpha_scan.py --url ... --name-field data.username  # Namensfeld selbst angeben
+    python gb_alpha_scan.py --url ... --workers 100               # hoechstens 100 parallel
+    python gb_alpha_scan.py --url ... --status-interval 10        # Status alle 10 statt 30 Sekunden
+    python gb_alpha_scan.py --url ... --start 1 --end 50000       # Teilbereich
+    python gb_alpha_scan.py --url ... --strict                    # nur Name beginnt mit "The" und endet mit "Alpha"
 
 Die Zahl paralleler Requests passt sich automatisch an: Bei Rate-Limits (429)
 wird sie halbiert, solange alles klappt, steigt sie langsam bis --workers.
-    python3 gb_alpha_scan.py --start 1 --end 50000 # Teilbereich
-    python3 gb_alpha_scan.py --strict              # nur Name beginnt mit "The" und endet mit "Alpha"
 
 Abbrechen mit Strg+C ist ok: Der Fortschritt wird in einer .progress-Datei
 gespeichert und beim naechsten Start automatisch fortgesetzt.
@@ -35,11 +41,17 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlsplit
 
-API_HOST = "gamebanana.com"
-API_PATH = "/apiv11/Member/{id}/ProfilePage"
-PROFILE_URL = "https://gamebanana.com/members/{id}"
-USER_AGENT = "gb-alpha-scan/1.1 (name search script)"
+# werden in main() aus --url gesetzt
+API_SCHEME = "https"
+API_HOST = ""
+API_PATH = ""
+NAME_FIELD = None  # z. B. "data.username"; None = automatisch suchen
+USER_AGENT = "Mozilla/5.0 (alpha-name-scan)"
+
+# Feldnamen, unter denen der Name ueblicherweise steht (in dieser Reihenfolge probiert)
+NAME_KEYS = ("username", "userName", "name", "nickname", "nick", "displayName", "display_name", "playerName")
 
 # "The" ... "Alpha" irgendwo im Namen (auch ohne Leerzeichen, z. B. "TheGoldenAlpha")
 LOOSE_RE = re.compile(r"the.*alpha", re.IGNORECASE)
@@ -102,7 +114,7 @@ def _pause_all(seconds):
     with _pause_lock:
         new_until = time.time() + seconds
         if seconds >= 5 and new_until > _pause_until + 1:
-            sys.stdout.write(f"[i] Rate-Limit: GameBanana verlangt {seconds:g}s Pause, alle Requests warten\n")
+            sys.stdout.write(f"[i] Rate-Limit: Server verlangt {seconds:g}s Pause, alle Requests warten\n")
         _pause_until = max(_pause_until, new_until)
         _rate_limited += 1
 
@@ -111,7 +123,7 @@ _first_429_seen = threading.Event()
 
 
 def _report_first_429(resp):
-    """Beim ersten 429 einmal zeigen, was GameBanana zum Limit sagt (hilft beim Einstellen)."""
+    """Beim ersten 429 einmal zeigen, was der Server zum Limit sagt (hilft beim Einstellen)."""
     if _first_429_seen.is_set():
         return
     _first_429_seen.set()
@@ -137,7 +149,10 @@ def _conn(timeout):
     """Eine dauerhafte HTTPS-Verbindung pro Thread (Keep-Alive, kein neuer TLS-Handshake pro Request)."""
     c = getattr(_local, "conn", None)
     if c is None:
-        c = http.client.HTTPSConnection(API_HOST, timeout=timeout, context=_ssl_ctx)
+        if API_SCHEME == "http":
+            c = http.client.HTTPConnection(API_HOST, timeout=timeout)
+        else:
+            c = http.client.HTTPSConnection(API_HOST, timeout=timeout, context=_ssl_ctx)
         _local.conn = c
     return c
 
@@ -161,9 +176,45 @@ def _request(path, headers, timeout):
         limiter.release()
 
 
+def _get_path(data, dotted):
+    for part in dotted.split("."):
+        if isinstance(data, list):
+            data = data[int(part)] if part.isdigit() and int(part) < len(data) else None
+        elif isinstance(data, dict):
+            data = data.get(part)
+        else:
+            return None
+    return data
+
+
+def _find_name(data, depth=0):
+    """Sucht rekursiv nach einem typischen Namensfeld."""
+    if depth > 4:
+        return None
+    if isinstance(data, dict):
+        for k in NAME_KEYS:
+            v = data.get(k)
+            if isinstance(v, str) and v.strip():
+                return v
+        for v in data.values():
+            found = _find_name(v, depth + 1)
+            if found:
+                return found
+    elif isinstance(data, list) and data:
+        return _find_name(data[0], depth + 1)
+    return None
+
+
+def extract_name(data):
+    if NAME_FIELD:
+        v = _get_path(data, NAME_FIELD)
+        return v if isinstance(v, str) and v.strip() else None
+    return _find_name(data)
+
+
 def fetch_name(member_id, timeout, max_retries):
     """Gibt den Namen zurueck, None wenn es die ID nicht gibt."""
-    path = API_PATH.format(id=member_id)
+    path = API_PATH.replace("{id}", str(member_id))
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     delay = 2.0
     attempt = 0
@@ -185,7 +236,7 @@ def fetch_name(member_id, timeout, max_retries):
                 continue
             if resp.status == 200:
                 limiter.success()
-                return json.loads(body.decode("utf-8", "replace")).get("_sName")
+                return extract_name(json.loads(body.decode("utf-8", "replace")))
             if resp.status in (404, 410):
                 limiter.success()
                 return None  # ID existiert nicht / geloescht
@@ -213,8 +264,34 @@ def fmt_duration(seconds):
     return f"{h}h {m:02d}m" if h else f"{m}m {s:02d}s"
 
 
+def run_test(member_id, timeout):
+    """Eine ID abfragen und alles zeigen, damit man sieht, ob URL und Namensfeld stimmen."""
+    path = API_PATH.replace("{id}", str(member_id))
+    print(f"GET {API_SCHEME}://{API_HOST}{path}")
+    resp, body = _request(path, {"User-Agent": USER_AGENT, "Accept": "application/json"}, timeout)
+    print(f"HTTP {resp.status} {resp.reason}")
+    text = body.decode("utf-8", "replace")
+    print("Antwort (Anfang):")
+    print(text[:1500])
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        print("\n[!] Antwort ist kein JSON. Das ist wahrscheinlich die Webseite, nicht die API-URL.")
+        return
+    name = extract_name(data)
+    if name:
+        print(f"\n[OK] Gefundener Name: {name!r}")
+    else:
+        print("\n[!] Kein Name gefunden. Schau oben, wo der Name steht, und gib ihn mit --name-field an "
+              "(z. B. --name-field data.username).")
+
+
 def main():
-    p = argparse.ArgumentParser(description="Sucht GameBanana-User mit 'The ... Alpha' im Namen.")
+    p = argparse.ArgumentParser(description="Sucht User mit 'The ... Alpha' im Namen.")
+    p.add_argument("--url", required=True, help='API-URL mit {id}, z. B. "https://beispiel.org/api/user/{id}"')
+    p.add_argument("--name-field", help="Pfad zum Namen im JSON, z. B. data.username (Standard: automatisch)")
+    p.add_argument("--profile-url", default="", help="optionale Profil-URL mit {id} fuer die CSV")
+    p.add_argument("--test", type=int, metavar="ID", help="nur diese eine ID abfragen und die Antwort zeigen")
     p.add_argument("--start", type=int, default=1)
     p.add_argument("--end", type=int, default=700_000)
     p.add_argument("--workers", type=int, default=200, help="hoechstens so viele parallele Requests (Standard: 200)")
@@ -227,8 +304,18 @@ def main():
     p.add_argument("--chunk", type=int, default=5000, help="IDs pro Block (Fortschritt wird pro Block gespeichert)")
     args = p.parse_args()
 
-    global limiter
+    global limiter, API_SCHEME, API_HOST, API_PATH, NAME_FIELD
+    if "{id}" not in args.url:
+        p.error("--url muss {id} enthalten")
+    u = urlsplit(args.url)
+    API_SCHEME, API_HOST = u.scheme or "https", u.netloc
+    API_PATH = (u.path or "/") + (f"?{u.query}" if u.query else "")
+    NAME_FIELD = args.name_field
     limiter = Limiter(args.start_workers, args.workers)
+
+    if args.test is not None:
+        run_test(args.test, args.timeout)
+        return
     pattern = STRICT_RE if args.strict else LOOSE_RE
     progress_file = args.out + ".progress"
 
@@ -317,7 +404,7 @@ def main():
                 chunk_end = min(chunk_start + args.chunk - 1, args.end)
                 hits = [h for h in pool.map(check, range(chunk_start, chunk_end + 1)) if h]
                 for member_id, name in hits:
-                    writer.writerow([member_id, name, PROFILE_URL.format(id=member_id)])
+                    writer.writerow([member_id, name, args.profile_url.replace("{id}", str(member_id))])
                     print(f"[+] {member_id}: {name}", flush=True)
                 stats["found"] += len(hits)
                 out.flush()
