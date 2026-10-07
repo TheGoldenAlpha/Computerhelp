@@ -38,10 +38,16 @@ der Bereich steht im Dateinamen, z. B. 1-700000):
   (--start/--end), sonst pruefen sie dieselben IDs doppelt und ihre Dateien
   geraten sich in die Quere.
 
-Die Zahl paralleler Requests passt sich automatisch an: Bei Rate-Limits (429/503)
-wird sie halbiert, solange alles klappt, steigt sie langsam bis --workers.
-GoBattle erlaubt pro IP nur etwa 1 Profil-Abfrage pro Sekunde, deshalb sind
-2 parallele Requests voreingestellt - mehr bringt nichts.
+Tempo
+-----
+GoBattle erlaubt pro IP nur etwa 1 Profil-Abfrage pro Sekunde (bei dir gemessen: 0.6-0.85).
+Das Script schickt deshalb die Anfragen in gleichmaessigem Abstand, statt zu probieren und
+nach jeder Ablehnung (503) eine feste Pause zu machen. Der Abstand passt sich selbst an:
+nach einem 503 wird er laenger, nach jeder erfolgreichen Antwort ganz leicht kuerzer. So
+pendelt er sich knapp unter dem Limit des Servers ein, es gibt nur wenige Ablehnungen, und
+das Tempo ist trotzdem so hoch, wie der Server es erlaubt. Ist ein Retry-After-Header da,
+wird er beachtet. Schneller als das Limit des Servers geht es nicht.
+2 parallele Requests sind voreingestellt (das reicht, damit sich Antwortzeiten ueberlappen).
 
 Abbrechen mit Strg+C ist ok: Der Fortschritt ist gespeichert und beim naechsten
 Start wird automatisch fortgesetzt.
@@ -172,14 +178,63 @@ class Limiter:
 limiter = None  # wird in main() gesetzt
 
 
+class Pacer:
+    """Gleichmaessiges Tempo: Der Abstand zwischen zwei Anfragen passt sich an.
+
+    Nach einem 503 wird der Abstand laenger, nach jeder erfolgreichen Antwort etwas kuerzer.
+    Dadurch landet das Tempo knapp unter dem Limit des Servers (etwa jede 25. Anfrage wird abgelehnt)."""
+
+    def __init__(self, start_interval, min_interval, max_interval=30.0):
+        self.interval = float(start_interval)
+        self.min = float(min_interval)
+        self.max = float(max_interval)
+        self.next_time = 0.0
+        self.last_cut = 0.0
+        self.fast_start = True  # bis zur ersten Ablehnung schnell herantasten, danach vorsichtig
+        self.lock = threading.Lock()
+
+    def wait_turn(self):
+        """Wartet, bis die naechste Anfrage dran ist (Startzeiten haben gleichmaessigen Abstand)."""
+        with self.lock:
+            now = time.monotonic()
+            start = max(now, self.next_time)
+            self.next_time = start + self.interval
+        if start > now:
+            time.sleep(start - now)
+
+    def success(self):
+        with self.lock:
+            self.interval = max(self.min, self.interval * (0.95 if self.fast_start else 0.99))
+
+    def rejected(self):
+        with self.lock:
+            self.fast_start = False
+            now = time.monotonic()
+            # Mehrere 503 von Anfragen, die schon unterwegs waren, zaehlen nur einmal
+            if now - self.last_cut > self.interval:
+                self.interval = min(self.max, self.interval * 1.3)
+                self.last_cut = now
+            # kurze Abkuehlung: die naechste Anfrage kommt erst nach einem vollen Abstand
+            self.next_time = max(self.next_time, now + self.interval)
+
+
+pacer = None  # wird in main() gesetzt
+
+
+def _count_rate_limit():
+    global _rate_limited
+    with _pause_lock:
+        _rate_limited += 1
+
+
 def _pause_all(seconds):
-    global _pause_until, _rate_limited
+    """Alle Requests warten (nur fuer einen Retry-After-Header des Servers)."""
+    global _pause_until
     with _pause_lock:
         new_until = time.time() + seconds
         if seconds >= 5 and new_until > _pause_until + 1:
             log(f"[i] Rate-Limit: Server verlangt {seconds:g}s Pause, alle Requests warten")
         _pause_until = max(_pause_until, new_until)
-        _rate_limited += 1
 
 
 _first_429_seen = threading.Event()
@@ -236,6 +291,7 @@ def _request(path, headers, timeout):
         # Pause erst NACH dem Platz im Limiter abwarten: sonst starten alle wartenden Threads
         # gleichzeitig los, sobald die Pause vorbei ist, und bekommen fast nur 503 zurueck.
         _wait_if_paused()
+        pacer.wait_turn()
         c = _conn(timeout)
         c.request("GET", path, headers=headers)
         resp = c.getresponse()
@@ -300,16 +356,20 @@ def fetch_name(member_id, timeout, max_retries):
                 # GoBattle meldet sein Rate-Limit mit 503 statt 429.
                 # Rate-Limits zaehlen nicht als Fehlversuch: drosseln, warten, dieselbe ID nochmal.
                 limiter.rate_limited()
+                pacer.rejected()  # Abstand wird laenger, die naechste Anfrage wartet einen vollen Abstand
+                _count_rate_limit()
                 retry_after = resp.getheader("Retry-After")
                 _report_first_429(resp)
                 _reset_conn()  # nach 429 frische Verbindung, falls der Server die alte haengen laesst
-                _pause_all(float(retry_after) if retry_after and retry_after.isdigit() else 1.0)
+                if retry_after and retry_after.isdigit():
+                    _pause_all(float(retry_after))
                 rate_limit_retries += 1
                 if rate_limit_retries > 1000:
                     raise RuntimeError("zu viele Rate-Limits")
                 continue
             if resp.status == 200:
                 limiter.success()
+                pacer.success()
                 try:
                     data = json.loads(body.decode("utf-8", "replace"))
                 except json.JSONDecodeError:
@@ -317,6 +377,7 @@ def fetch_name(member_id, timeout, max_retries):
                 return extract_name(data)
             if resp.status in (404, 410):
                 limiter.success()
+                pacer.success()
                 return None  # ID existiert nicht / geloescht
             # alles andere (z. B. 5xx): kurz wiederholen, danach als fehlgeschlagen melden
             if attempt < max_retries:
@@ -461,6 +522,10 @@ def main():
     p.add_argument("--strict", action="store_true", help="nur 'The ... Alpha' ohne etwas davor/danach")
     p.add_argument("--timeout", type=float, default=15)
     p.add_argument("--retries", type=int, default=3, help="Wiederholungen bei Serverfehlern (Standard: 3)")
+    p.add_argument("--start-interval", type=float, default=1.0,
+                   help="Abstand zwischen zwei Anfragen am Anfang in Sekunden (Standard: 1.0, passt sich selbst an)")
+    p.add_argument("--min-interval", type=float, default=0.1,
+                   help="kuerzester erlaubter Abstand in Sekunden (Standard: 0.1)")
     p.add_argument("--chunk", type=int, default=20,
                    help="IDs pro Stueck; nach jedem Stueck wird die letzte fertige ID gespeichert (Standard: 20)")
     p.add_argument("--no-git", action="store_true", help="nichts per Git holen oder sichern, nur lokal speichern")
@@ -472,7 +537,7 @@ def main():
         except (AttributeError, ValueError):
             pass
 
-    global limiter, API_SCHEME, API_HOST, API_PATH, NAME_FIELD
+    global limiter, pacer, API_SCHEME, API_HOST, API_PATH, NAME_FIELD
     if "{id}" not in args.url:
         p.error("--url muss {id} enthalten")
     u = urlsplit(args.url)
@@ -480,6 +545,7 @@ def main():
     API_PATH = (u.path or "/") + (f"?{u.query}" if u.query else "")
     NAME_FIELD = None if args.name_field == "auto" else args.name_field
     limiter = Limiter(args.start_workers, args.workers)
+    pacer = Pacer(args.start_interval, args.min_interval)
 
     if args.test is not None:
         run_test(args.test, args.timeout)
@@ -571,7 +637,8 @@ def main():
         pause_left = _pause_until - now
         pause_txt = f" | PAUSE noch {pause_left:.0f}s" if pause_left > 0 else ""
         log(f"[{label}] {n(start - 1 + done)}/{n(args.end)} ({done / total:.1%}) | "
-            f"{rate:.1f} IDs/s (Schnitt {avg:.1f}) | Parallel: {limiter.active}/{int(limiter.limit)} | "
+            f"{rate:.2f} IDs/s (Schnitt {avg:.2f}) | Abstand {pacer.interval:.2f}s | "
+            f"Parallel: {limiter.active}/{int(limiter.limit)} | "
             f"Laufzeit {fmt_duration(elapsed)} | Rest ca. {eta_txt} (nach Schnitt) | "
             f"User: {n(stats['exists'])} | Treffer: {stats['found']} | "
             f"Fehler: {stats['errors']} | Rate-Limits: {n(_rate_limited)} | "

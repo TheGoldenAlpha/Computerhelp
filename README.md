@@ -43,7 +43,7 @@ python alpha_scan.py --start 1 --end 350000
 python alpha_scan.py --start 350001 --end 700000
 ```
 
-Das Rate-Limit von GoBattle gilt pro IP-Adresse. Jeder Rechner hält sich einzeln daran (2 parallele Anfragen, Pause bei jedem 503).
+Das Rate-Limit von GoBattle gilt pro IP-Adresse. Jeder Rechner hält sich einzeln daran: Das Script schickt die Anfragen in gleichmässigem Abstand. Der Abstand wird nach einem 503 länger und nach jeder erfolgreichen Antwort leicht kürzer. So bleibt das Tempo knapp unter dem Limit, mit nur wenigen Ablehnungen (in der Statuszeile steht der aktuelle `Abstand`).
 
 ### Weitere Optionen
 
