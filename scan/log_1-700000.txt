@@ -141,3 +141,5 @@
 [2026-10-07 15:55:19] [STATUS] bis ID 13'099 | 55/686'941 (0.0%) | 0.60 IDs/s (Schnitt 0.55) | Laufzeit 1m 40s | Rest ca. 347h 07m | User: 13 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 18 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x15 404x40 503x18 | Git: gesichert
 [2026-10-07 15:55:39] [STATUS] bis ID 13'119 | 65/686'941 (0.0%) | 0.50 IDs/s (Schnitt 0.54) | Laufzeit 2m 00s | Rest ca. 352h 26m | User: 17 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 21 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x19 404x46 503x21 | Git: gesichert
 [2026-10-07 15:55:59] [STATUS] bis ID 13'119 | 75/686'941 (0.0%) | 0.50 IDs/s (Schnitt 0.54) | Laufzeit 2m 20s | Rest ca. 356h 20m | User: 17 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 28 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x19 404x56 503x28 | Git: gesichert
+[2026-10-07 15:56:13] [i] --max-minutes 2 erreicht, höre sauber auf.
+[2026-10-07 15:56:13] [FERTIG] bis ID 13'139 | 80/686'941 (0.0%) | 0.35 IDs/s (Schnitt 0.52) | Laufzeit 2m 34s | Rest ca. 367h 40m | User: 17 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 31 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x19 404x61 503x31 | Git: gesichert
