@@ -126,3 +126,5 @@
 [2026-10-07 15:52:58] [STATUS] bis ID 13'039 | 61/687'021 (0.0%) | 0.55 IDs/s (Schnitt 0.61) | Laufzeit 1m 40s | Rest ca. 312h 59m | User: 10 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x10 404x51 | Git: gesichert
 [2026-10-07 15:53:18] [STATUS] bis ID 13'039 | 75/687'021 (0.0%) | 0.70 IDs/s (Schnitt 0.62) | Laufzeit 2m 00s | Rest ca. 305h 27m | User: 15 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x15 404x60 | Git: gesichert
 [2026-10-07 15:53:19] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
+[2026-10-07 15:53:33] [i] --max-minutes 2 erreicht, höre sauber auf.
+[2026-10-07 15:53:33] [FERTIG] bis ID 13'059 | 80/687'021 (0.0%) | 0.34 IDs/s (Schnitt 0.59) | Laufzeit 2m 14s | Rest ca. 321h 13m | User: 16 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 3 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x16 404x64 503x3 | Git: gesichert
