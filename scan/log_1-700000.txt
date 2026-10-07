@@ -12,3 +12,4 @@
 [2026-10-07 15:01:21] Scanne IDs 11440..700000 mit bis zu 2 parallelen Requests, Status und Git-Sicherung alle 30 Sekunden
 [2026-10-07 15:01:23] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
 [2026-10-07 15:01:51] [STATUS] 11'458/700'000 (0.0%) | 0.6 IDs/s (Schnitt 0.6) | Parallel: 0/2 | Laufzeit 0m 30s | Rest ca. 302h 02m (nach Schnitt) | User: 6 | Treffer: 0 | Fehler: 0 | Rate-Limits: 35 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x6 404x13 503x35 | Gespeichert bis ID 11'439 | Git: - | PAUSE noch 1s
+[2026-10-07 15:02:21] [STATUS] 11'473/700'000 (0.0%) | 0.5 IDs/s (Schnitt 0.6) | Parallel: 0/2 | Laufzeit 1m 00s | Rest ca. 337h 36m (nach Schnitt) | User: 7 | Treffer: 0 | Fehler: 0 | Rate-Limits: 67 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x7 404x27 503x67 | Gespeichert bis ID 11'459 | Git: gesichert | PAUSE noch 0s
