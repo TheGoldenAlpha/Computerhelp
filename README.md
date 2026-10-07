@@ -53,3 +53,15 @@ Das Rate-Limit von GoBattle gilt pro IP-Adresse. Jeder Rechner hält sich einzel
 | `--strict` | nur Namen, die mit "The" beginnen und mit "Alpha" enden |
 | `--no-git` | nichts per Git holen oder sichern, nur lokal speichern |
 | `--status-interval 60` | Status und Git-Sicherung alle 60 statt 30 Sekunden |
+
+### Einfache Version zum Selberbauen (`alpha_scan_simple.py`)
+
+Gleiche Dateien und gleicher Fortschritt wie `alpha_scan.py`, aber ohne automatische Tempo-Anpassung.
+Das Rate-Limit baust du selbst in zwei Funktionen ein, im Script mit `RATE-LIMIT` markiert:
+`limit_before_request()` (vor jeder Anfrage) und `limit_after_response()` (nach jeder Antwort).
+Antworten mit HTTP 503 werden gezählt, geloggt, bis zu 3 Mal wiederholt und danach in `failed_*.txt` notiert.
+Mit `--retry-failed` werden diese IDs später nochmal geprüft.
+
+```
+python alpha_scan_simple.py --delay 1.2
+```

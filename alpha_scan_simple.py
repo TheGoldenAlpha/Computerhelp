@@ -1,0 +1,620 @@
+#!/usr/bin/env python3
+"""
+alpha_scan_simple.py – einfache Version des GoBattle-Scans (ohne automatische Tempo-Anpassung)
+================================================================================================
+
+Dieses Script sucht alle GoBattle-Spieler, deren Name zum Muster "The ... Alpha" passt.
+Es ist die EINFACHE Variante von alpha_scan.py:
+
+* Es passt sein Tempo NICHT selbst an das Rate-Limit an.
+* Das Rate-Limit baust DU selbst ein, an genau zwei Stellen (siehe unten):
+      >>> STELLE 1:  limit_before_request()      (vor jeder Anfrage)
+      >>> STELLE 2:  limit_after_response(...)   (nach jeder Antwort)
+  Beide Stellen sind im Code mit  ##### RATE-LIMIT  markiert. Suche im Script nach "RATE-LIMIT".
+* Fehler wie HTTP 503 (= Rate-Limit von GoBattle) werden trotzdem aufgenommen: gezählt, ins Log
+  geschrieben, dieselbe ID wird einige Male nochmal versucht, und wenn es nicht klappt, steht
+  die ID in scan/failed_<Bereich>.txt. Mit  --retry-failed  kannst du diese IDs später nochmal prüfen.
+
+Wichtig zum Limit: GoBattle begrenzt pro IP-Adresse (Antwort 503, Header x-rate-limit-key = deine IP).
+Halte dich an dieses Limit. Keine Proxys, keine IP-Wechsel, nicht über den Selah-Worker-Proxy abfragen.
+
+Aufruf
+------
+    python alpha_scan_simple.py                       # macht bei der letzten gespeicherten ID weiter
+    python alpha_scan_simple.py --test 12345          # nur eine ID abfragen und die Antwort zeigen
+    python alpha_scan_simple.py --delay 1.2           # Platzhalter-Abstand zwischen zwei Anfragen (Sekunden)
+    python alpha_scan_simple.py --retry-failed        # nur die IDs aus failed_*.txt nochmal prüfen
+    python alpha_scan_simple.py --no-git              # ohne Git, nur lokal speichern
+    python alpha_scan_simple.py --start 1 --end 350000   # Teilbereich (z. B. für einen zweiten Rechner)
+
+Dateien (Ordner "scan", gleiche Dateien wie bei alpha_scan.py, man kann also nahtlos wechseln)
+---------------------------------------------------------------------------------------------
+    scan/progress_<Bereich>.txt     letzte fertig geprüfte ID
+    scan/log_<Bereich>.txt          alles, was in der Shell steht, mit Uhrzeit
+    scan/alpha_users_<Bereich>.csv  die Treffer (id, name, profil)
+    scan/failed_<Bereich>.txt       IDs, die auch nach Wiederholungen nicht abgefragt werden konnten
+
+Ablauf im Überblick (wo passiert was?)
+--------------------------------------
+    main()
+      1. git pull holen                                    -> git_pull()
+      2. letzte gespeicherte ID lesen                      -> read_progress()
+      3. IDs in kleinen Stücken (--chunk, 20 IDs) abarbeiten
+            für jede ID:  check()  ->  fetch_name()
+                                          ├─ limit_before_request()      <<< RATE-LIMIT STELLE 1
+                                          ├─ HTTP-Anfrage
+                                          ├─ limit_after_response()      <<< RATE-LIMIT STELLE 2
+                                          └─ 200 = Name, 404 = gibt es nicht,
+                                             503 = Rate-Limit (zählen, loggen, nochmal versuchen),
+                                             anderer Fehler = nochmal versuchen, sonst failed_*.txt
+      4. nach jedem Stück: Treffer in die CSV, dann Fortschritt speichern   -> write_progress()
+      5. alle 30 Sekunden: Status ausgeben und per Git sichern             -> git_sync()
+"""
+
+import argparse
+import csv
+import http.client
+import json
+import os
+import re
+import socket
+import ssl
+import subprocess
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlsplit
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+API_URL = "https://alpha.gobattle.io/api.php/api/profile/{id}"
+NAME_FIELD = "user.nick"  # Pfad zum Namen in der JSON-Antwort
+USER_AGENT = "Mozilla/5.0 (alpha-name-scan)"
+
+# "The" ... "Alpha" irgendwo im Namen (auch ohne Leerzeichen, z. B. "TheGoldenAlpha")
+LOOSE_RE = re.compile(r"the.*alpha", re.IGNORECASE)
+# Name beginnt mit "The" und endet mit "Alpha"
+STRICT_RE = re.compile(r"^\s*the\b.*\balpha\s*$", re.IGNORECASE)
+
+# werden in main() gesetzt
+API_SCHEME, API_HOST, API_PATH = "https", "", ""
+REQUEST_DELAY = 1.0  # Platzhalter-Abstand, nur von limit_before_request() benutzt
+MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, danach -> failed_*.txt
+
+
+# =====================================================================================
+# ##### RATE-LIMIT  –  HIER BAUST DU DAS LIMIT EIN  #####
+# =====================================================================================
+#
+# Es gibt zwei Stellen. Beide werden von JEDEM Thread aufgerufen (es laufen standardmässig
+# 2 Threads gleichzeitig, siehe --workers). Wenn du gemeinsamen Zustand brauchst (z. B. "wann
+# darf die nächste Anfrage los?"), schütze ihn mit einem Lock, wie unten im Beispiel.
+#
+# Wie viel erlaubt ist, hast du gesehen: deine IP schafft etwa 0.5 bis 1.2 IDs pro Sekunde.
+# Der Server meldet kein "noch X übrig" und keine Wartezeit. Du musst es also selbst schätzen.
+# -------------------------------------------------------------------------------------
+
+_limit_lock = threading.Lock()
+
+
+def limit_before_request():
+    """##### RATE-LIMIT STELLE 1: Wird VOR JEDER Anfrage aufgerufen.
+
+    Aufgabe: warten, bis die nächste Anfrage erlaubt ist. Kehrt die Funktion zurück, geht die
+    Anfrage sofort raus. Hier gehört deine Logik hin, z. B.:
+      * feste Wartezeit zwischen zwei Anfragen (wie im Platzhalter unten),
+      * ein "Token-Bucket" (z. B. höchstens N Anfragen pro Sekunde, Burst erlauben),
+      * eine Pause, wenn kürzlich ein 503 kam (dafür merkst du dir in STELLE 2 einen Zeitpunkt
+        in einer globalen Variable und wartest hier, bis er vorbei ist).
+
+    PLATZHALTER (einfach, nicht adaptiv): Es wird immer REQUEST_DELAY Sekunden gewartet, und zwar
+    für alle Threads zusammen (das Lock sorgt dafür, dass sie sich hintereinander anstellen).
+    Ergibt also etwa 1 / REQUEST_DELAY Anfragen pro Sekunde, egal wie viele Threads laufen.
+    Ändere das Tempo mit --delay oder ersetze diesen Block durch deine eigene Logik.
+    """
+    with _limit_lock:
+        time.sleep(REQUEST_DELAY)
+
+
+def limit_after_response(status, headers):
+    """##### RATE-LIMIT STELLE 2: Wird NACH JEDER Antwort aufgerufen (auch bei 503).
+
+    status:  HTTP-Statuscode (200, 404, 503, ...)
+    headers: Liste von (Name, Wert), z. B. [("x-rate-limit-key", "212.41.217.65"), ...]
+
+    Hier siehst du, ob das Limit zugeschlagen hat: status == 503 (manchmal 429) heisst
+    "zu schnell". Hier kannst du dein Tempo anpassen, z. B.:
+      * nach einem 503 einen Zeitpunkt merken, bis zu dem STELLE 1 warten soll,
+      * den Abstand vergrössern (und nach Erfolgen langsam wieder verkleinern),
+      * einen "Retry-After"-Header beachten, falls GoBattle einmal einen schickt
+        (bisher schickt es keinen).
+
+    Die Funktion darf auch selbst schlafen (time.sleep); dann wartet nur dieser Thread.
+    Das Wiederholen der ID bei 503 erledigt fetch_name() selbst, darum musst du dich hier nicht kümmern.
+
+    PLATZHALTER: tut nichts.
+    """
+    return
+
+
+# =====================================================================================
+# Log: alles, was in der Shell steht, kommt zusätzlich mit Uhrzeit in eine Textdatei
+# =====================================================================================
+_log_lock = threading.RLock()
+_log_path = None
+_log_pending = []  # Zeilen, die vor dem Festlegen der Logdatei anfielen
+
+
+def log(msg):
+    """Zeile in die Shell schreiben und (mit Uhrzeit) in die Logdatei."""
+    with _log_lock:
+        print(msg, flush=True)
+        line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n"
+        if _log_path is None:
+            _log_pending.append(line)
+            return
+        _append_log(line)
+
+
+def _append_log(text):
+    try:
+        with open(_log_path, "a", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+    except OSError as e:
+        print(f"[!] Logdatei nicht beschreibbar: {e}", flush=True)
+
+
+def set_log_file(path):
+    global _log_path
+    with _log_lock:
+        _log_path = path
+        if _log_pending:
+            _append_log("".join(_log_pending))
+            _log_pending.clear()
+
+
+# =====================================================================================
+# Zähler für den Status (Fehler wie 503 werden hier aufgenommen)
+# =====================================================================================
+_stat_lock = threading.Lock()
+_codes = {}          # HTTP-Statuscode -> Anzahl, z. B. {200: 13, 404: 22, 503: 12}
+_rate_limited = 0    # Anzahl 503/429-Antworten
+_net_errors = 0      # Timeouts / abgebrochene Verbindungen
+_first_503_seen = threading.Event()
+_local = threading.local()  # pro Thread eine dauerhafte Verbindung
+_ssl_ctx = ssl.create_default_context()
+
+
+def _count_code(code):
+    with _stat_lock:
+        _codes[code] = _codes.get(code, 0) + 1
+
+
+# =====================================================================================
+# HTTP
+# =====================================================================================
+def _conn(timeout):
+    """Eine dauerhafte Verbindung pro Thread (kein neuer TLS-Handshake bei jeder Anfrage)."""
+    c = getattr(_local, "conn", None)
+    if c is None:
+        if API_SCHEME == "http":
+            c = http.client.HTTPConnection(API_HOST, timeout=timeout)
+        else:
+            c = http.client.HTTPSConnection(API_HOST, timeout=timeout, context=_ssl_ctx)
+        _local.conn = c
+    return c
+
+
+def _reset_conn():
+    c = getattr(_local, "conn", None)
+    if c is not None:
+        c.close()
+    _local.conn = None
+
+
+def _get_path(data, dotted):
+    for part in dotted.split("."):
+        if isinstance(data, list):
+            data = data[int(part)] if part.isdigit() and int(part) < len(data) else None
+        elif isinstance(data, dict):
+            data = data.get(part)
+        else:
+            return None
+    return data
+
+
+def extract_name(data):
+    v = _get_path(data, NAME_FIELD)
+    return v if isinstance(v, str) and v.strip() else None
+
+
+def fetch_name(member_id, timeout, max_retries):
+    """Fragt eine ID ab. Gibt den Namen zurück, None wenn es die ID nicht gibt.
+
+    Bei einer unklaren Antwort wird eine Ausnahme geworfen: Die ID zählt dann als
+    fehlgeschlagen und wird in failed_*.txt notiert (statt still als "gibt es nicht" zu gelten)."""
+    global _rate_limited, _net_errors
+    path = API_PATH.replace("{id}", str(member_id))
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    tries_503 = 0
+    tries_other = 0
+    delay = 1.0
+    while True:
+        limit_before_request()                      # <<< RATE-LIMIT STELLE 1 (vor der Anfrage)
+        try:
+            c = _conn(timeout)
+            c.request("GET", path, headers=headers)
+            resp = c.getresponse()
+            body = resp.read()
+        except (http.client.HTTPException, OSError):
+            # Timeout oder Verbindung abgebrochen
+            _reset_conn()
+            with _stat_lock:
+                _net_errors += 1
+            if tries_other < max_retries:
+                tries_other += 1
+                time.sleep(delay)
+                delay = min(delay * 2, 10)
+                continue
+            raise
+
+        _count_code(resp.status)
+        limit_after_response(resp.status, resp.getheaders())   # <<< RATE-LIMIT STELLE 2 (nach der Antwort)
+
+        if resp.status in (429, 503):
+            # GoBattle meldet sein Rate-Limit mit 503. Das ist KEIN Fehler der ID: zählen,
+            # beim ersten Mal die Header zeigen, dieselbe ID nochmal versuchen.
+            with _stat_lock:
+                _rate_limited += 1
+            if not _first_503_seen.is_set():
+                _first_503_seen.set()
+                info = ", ".join(f"{k}: {v}" for k, v in resp.getheaders()
+                                 if k.lower() == "retry-after" or "rate" in k.lower())
+                log(f"[i] Erstes Rate-Limit (HTTP {resp.status}). Header vom Server: {info or 'keine Limit-Angaben'}")
+            _reset_conn()  # frische Verbindung, falls der Server die alte hängen lässt
+            tries_503 += 1
+            if tries_503 > MAX_503_RETRIES:
+                # aufgeben: die ID kommt in failed_*.txt und kann später mit --retry-failed geprüft werden
+                raise RuntimeError(f"HTTP {resp.status} (Rate-Limit), {MAX_503_RETRIES} Wiederholungen erfolglos")
+            continue
+
+        if resp.status == 200:
+            try:
+                data = json.loads(body.decode("utf-8", "replace"))
+            except json.JSONDecodeError:
+                raise RuntimeError("HTTP 200, aber kein JSON")
+            return extract_name(data)
+
+        if resp.status in (404, 410):
+            return None  # ID existiert nicht / gelöscht
+
+        # alles andere (z. B. 500): kurz wiederholen, danach als fehlgeschlagen melden
+        if tries_other < max_retries:
+            tries_other += 1
+            time.sleep(delay)
+            delay = min(delay * 2, 10)
+            continue
+        raise RuntimeError(f"HTTP {resp.status}")
+
+
+def run_test(member_id, timeout):
+    """Eine ID abfragen und alles zeigen (prüft URL und Namensfeld)."""
+    path = API_PATH.replace("{id}", str(member_id))
+    print(f"GET {API_SCHEME}://{API_HOST}{path}")
+    c = _conn(timeout)
+    c.request("GET", path, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    resp = c.getresponse()
+    text = resp.read().decode("utf-8", "replace")
+    print(f"HTTP {resp.status} {resp.reason}")
+    print("Antwort (Anfang):")
+    print(text[:1500])
+    try:
+        name = extract_name(json.loads(text))
+    except json.JSONDecodeError:
+        print("\n[!] Antwort ist kein JSON.")
+        return
+    print(f"\n[OK] Gefundener Name: {name!r}" if name else "\n[!] Kein Name gefunden.")
+
+
+# =====================================================================================
+# Fortschritt speichern und per Git sichern
+# =====================================================================================
+_git_ident = []  # wird gesetzt, wenn auf dem Rechner kein Git-Name/E-Mail eingestellt ist
+
+
+def _git(*args, timeout=120):
+    """Git im Ordner dieses Scripts ausführen. Gibt immer ein Ergebnis zurück (nie eine Ausnahme)."""
+    try:
+        return subprocess.run(["git", "-C", SCRIPT_DIR] + _git_ident + list(args), capture_output=True,
+                              text=True, encoding="utf-8", errors="replace", timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return subprocess.CompletedProcess(args, 255, "", str(e))
+
+
+def _err(r):
+    return ((r.stderr or "") + (r.stdout or "")).strip().replace("\n", " ")[:300]
+
+
+def git_branch():
+    """Name des aktuellen Branches oder None (kein Git-Ordner)."""
+    r = _git("rev-parse", "--abbrev-ref", "HEAD")
+    name = r.stdout.strip()
+    if r.returncode != 0 or not name or name == "HEAD":
+        return None
+    if not _git("config", "user.email").stdout.strip():
+        _git_ident[:] = ["-c", "user.name=alpha-scan", "-c", "user.email=alpha-scan@localhost"]
+    return name
+
+
+def git_pull(branch):
+    with _log_lock:
+        r = _git("pull", "--rebase", "--autostash", "-q", "origin", branch)
+        if r.returncode != 0:
+            _git("rebase", "--abort")
+            return False, _err(r)
+    return True, "ok"
+
+
+def git_sync(branch, msg):
+    """Ordner scan sichern: commit, neuesten Stand holen, push."""
+    with _log_lock:  # während Git arbeitet, schreibt kein anderer Thread ins Log
+        _git("add", "scan")
+        if _git("status", "--porcelain", "--", "scan").stdout.strip():
+            r = _git("commit", "-q", "-m", msg, "--", "scan")
+            if r.returncode != 0:
+                return False, "commit: " + _err(r)
+        for _ in range(3):
+            r = _git("pull", "--rebase", "--autostash", "-q", "origin", branch)
+            if r.returncode != 0:
+                _git("rebase", "--abort")
+                return False, "pull: " + _err(r)
+            r = _git("push", "-q", "origin", f"HEAD:{branch}")
+            if r.returncode == 0:
+                return True, "ok"
+        return False, "push: " + _err(r)
+
+
+def read_progress(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return int(f.read().strip() or 0)
+    except (OSError, ValueError):
+        return 0
+
+
+def write_progress(path, value):
+    """Atomar schreiben (erst temporäre Datei, dann ersetzen), damit nie eine halbe Datei entsteht."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"{value}\n")
+    os.replace(tmp, path)
+
+
+def fmt_duration(seconds):
+    seconds = int(seconds)
+    h, rest = divmod(seconds, 3600)
+    m, s = divmod(rest, 60)
+    return f"{h}h {m:02d}m" if h else f"{m}m {s:02d}s"
+
+
+def n(x):
+    return f"{x:,}".replace(",", "'")
+
+
+# =====================================================================================
+# main
+# =====================================================================================
+def main():
+    global API_SCHEME, API_HOST, API_PATH, REQUEST_DELAY, MAX_503_RETRIES
+    p = argparse.ArgumentParser(description="Sucht User mit 'The ... Alpha' im Namen (einfache Version).")
+    p.add_argument("--test", type=int, metavar="ID", help="nur diese eine ID abfragen und die Antwort zeigen")
+    p.add_argument("--start", type=int, default=1)
+    p.add_argument("--end", type=int, default=700_000)
+    p.add_argument("--workers", type=int, default=2, help="parallele Anfragen (Standard: 2)")
+    p.add_argument("--delay", type=float, default=1.0,
+                   help="Platzhalter-Abstand in Sekunden zwischen zwei Anfragen, nur wirksam solange "
+                        "limit_before_request() den Platzhalter enthält (Standard: 1.0)")
+    p.add_argument("--retries-503", type=int, default=3,
+                   help="so oft dieselbe ID bei HTTP 503 nochmal versucht wird (Standard: 3)")
+    p.add_argument("--retries", type=int, default=3, help="Wiederholungen bei Serverfehlern/Timeouts (Standard: 3)")
+    p.add_argument("--timeout", type=float, default=15)
+    p.add_argument("--chunk", type=int, default=20,
+                   help="IDs pro Stück; nach jedem Stück wird der Fortschritt gespeichert (Standard: 20)")
+    p.add_argument("--status-interval", type=float, default=30,
+                   help="Status und Git-Sicherung alle N Sekunden (Standard: 30)")
+    p.add_argument("--strict", action="store_true", help="nur 'The ... Alpha' ohne etwas davor/danach")
+    p.add_argument("--retry-failed", action="store_true",
+                   help="nur die IDs aus scan/failed_<Bereich>.txt nochmal prüfen (Fortschritt bleibt unverändert)")
+    p.add_argument("--no-git", action="store_true", help="nichts per Git holen oder sichern, nur lokal speichern")
+    p.add_argument("--url", default=API_URL, help="API-URL mit {id} (Standard: GoBattle-Profil-API)")
+    args = p.parse_args()
+
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")  # Namen mit Sonderzeichen sollen die Shell nicht abstürzen lassen
+        except (AttributeError, ValueError):
+            pass
+
+    if "{id}" not in args.url:
+        p.error("--url muss {id} enthalten")
+    u = urlsplit(args.url)
+    API_SCHEME, API_HOST = u.scheme or "https", u.netloc
+    API_PATH = (u.path or "/") + (f"?{u.query}" if u.query else "")
+    REQUEST_DELAY = args.delay
+    MAX_503_RETRIES = args.retries_503
+
+    if args.test is not None:
+        run_test(args.test, args.timeout)
+        return
+    pattern = STRICT_RE if args.strict else LOOSE_RE
+
+    # 1. Neuesten Stand aus Git holen, BEVOR eigene Dateien angelegt werden
+    branch = None
+    if not args.no_git:
+        branch = git_branch()
+        if branch is None:
+            log("[!] Kein Git-Branch gefunden - speichere nur lokal (mit --no-git ist diese Meldung weg).")
+        else:
+            ok, text = git_pull(branch)
+            log(f"[git] Neuesten Stand geholt (Branch {branch})" if ok
+                else f"[!] git pull fehlgeschlagen, mache mit dem lokalen Stand weiter: {text}")
+
+    # 2. Dateien pro Bereich
+    scan_dir = os.path.join(SCRIPT_DIR, "scan")
+    os.makedirs(scan_dir, exist_ok=True)
+    tag = f"{args.start}-{args.end}"
+    progress_file = os.path.join(scan_dir, f"progress_{tag}.txt")
+    hits_file = os.path.join(scan_dir, f"alpha_users_{tag}.csv")
+    failed_file = os.path.join(scan_dir, f"failed_{tag}.txt")
+    set_log_file(os.path.join(scan_dir, f"log_{tag}.txt"))
+    log(f"=== Start (einfache Version) auf {socket.gethostname()} | Bereich {tag} | Python {sys.version.split()[0]} ===")
+
+    # 3. Welche IDs sind dran?
+    if args.retry_failed:
+        try:
+            with open(failed_file, encoding="utf-8") as f:
+                todo = sorted({int(x) for x in f.read().split() if x.strip().isdigit()})
+        except OSError:
+            todo = []
+        if not todo:
+            log("Keine fehlgeschlagenen IDs vorhanden.")
+            return
+        log(f"Prüfe {len(todo)} fehlgeschlagene IDs nochmal")
+        start_id = todo[0]
+    else:
+        start_id = args.start
+        saved = read_progress(progress_file)
+        if saved >= start_id:
+            start_id = saved + 1
+            log(f"Setze fort ab ID {start_id} (letzte gespeicherte ID: {saved})")
+        if start_id > args.end:
+            log("Bereich ist schon komplett gescannt.")
+            return
+        todo = range(start_id, args.end + 1)
+
+    new_file = not os.path.exists(hits_file)
+    out = open(hits_file, "a", newline="", encoding="utf-8")
+    writer = csv.writer(out)
+    if new_file:
+        writer.writerow(["id", "name", "profil"])
+        out.flush()
+
+    lock = threading.Lock()
+    stats = {"found": 0, "errors": 0, "exists": 0, "done": 0}
+    t0 = time.time()
+    total = len(todo)
+    sync_state = {"text": "-"}
+    saved_up_to = {"id": start_id - 1}
+    last = {"t": t0, "done": 0}
+    still_failed = []  # nur für --retry-failed
+
+    log(f"Scanne {n(total)} IDs ab {start_id} mit {args.workers} parallelen Anfragen "
+        f"(Platzhalter-Abstand {args.delay:g}s), Status und Git-Sicherung alle {args.status_interval:g} Sekunden")
+
+    def check(member_id):
+        """Gibt ('hit', id, name), ('fail', id, grund) oder None zurück."""
+        try:
+            name = fetch_name(member_id, args.timeout, args.retries)
+        except Exception as e:
+            with lock:
+                stats["errors"] += 1
+                stats["done"] += 1
+            return ("fail", member_id, str(e)[:80] or type(e).__name__)
+        with lock:
+            stats["done"] += 1
+            if name is not None:
+                stats["exists"] += 1
+        if name is not None and pattern.search(name):
+            return ("hit", member_id, name)
+        return None
+
+    def status(final=False):
+        now = time.time()
+        done = stats["done"]
+        elapsed = now - t0
+        rate = (done - last["done"]) / max(now - last["t"], 1e-6)  # Tempo der letzten Periode
+        avg = done / max(elapsed, 1e-6)
+        last.update(t=now, done=done)
+        eta = fmt_duration((total - done) / avg) if avg > 0 else "?"
+        log(f"[{'FERTIG' if final else 'STATUS'}] bis ID {n(saved_up_to['id'])} | {done}/{n(total)} ({done / total:.1%}) | "
+            f"{rate:.2f} IDs/s (Schnitt {avg:.2f}) | Laufzeit {fmt_duration(elapsed)} | Rest ca. {eta} | "
+            f"User: {n(stats['exists'])} | Treffer: {stats['found']} | Fehler: {stats['errors']} | "
+            f"Rate-Limits (503): {n(_rate_limited)} | Timeouts/Verbindungsfehler: {_net_errors} | "
+            f"HTTP: {' '.join(f'{k}x{n(v)}' for k, v in sorted(_codes.items())) or '-'} | Git: {sync_state['text']}")
+
+    stop_status = threading.Event()
+
+    def status_loop():
+        while not stop_status.wait(args.status_interval):
+            status()
+
+    threading.Thread(target=status_loop, daemon=True).start()
+
+    def do_sync(reason):
+        if branch is None:
+            return
+        ok, text = git_sync(branch, f"Scan {tag}: bis ID {saved_up_to['id']} ({socket.gethostname()}, {reason})")
+        sync_state["text"] = "gesichert" if ok else "FEHLER"
+        if not ok:
+            log(f"[!] Git-Sicherung fehlgeschlagen (der Scan läuft trotzdem weiter und speichert lokal): {text}")
+
+    # 4. Abarbeiten in kleinen Stücken. Nach jedem Stück: Treffer schreiben, DANN Fortschritt speichern.
+    last_sync = time.time()
+    ids = list(todo)
+    try:
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            pos = 0
+            while pos < len(ids):
+                block = ids[pos:pos + args.chunk]
+                results = [r for r in pool.map(check, block) if r]
+                hits = [r for r in results if r[0] == "hit"]
+                fails = [r for r in results if r[0] == "fail"]
+                for _, member_id, name in hits:
+                    writer.writerow([member_id, name, f"https://selahgb.org/search.html?id={member_id}"])
+                if hits:
+                    out.flush()
+                if fails and not args.retry_failed:
+                    with open(failed_file, "a", encoding="utf-8", newline="\n") as f:
+                        for _, member_id, _reason in fails:
+                            f.write(f"{member_id}\n")
+                still_failed.extend(m for _, m, _r in fails)
+                for _, member_id, name in hits:
+                    log(f"[+] {member_id}: {name}")
+                for _, member_id, reason in fails:
+                    log(f"[!] ID {member_id} fehlgeschlagen ({reason})")
+                stats["found"] += len(hits)
+                pos += len(block)
+                if not args.retry_failed:
+                    write_progress(progress_file, block[-1])
+                saved_up_to["id"] = block[-1]
+                if time.time() - last_sync >= args.status_interval:
+                    do_sync("laufend")
+                    last_sync = time.time()
+    except KeyboardInterrupt:
+        log(f"Abgebrochen bei ID {saved_up_to['id']} - Fortschritt ist gespeichert, "
+            f"einfach denselben Befehl nochmal starten zum Fortsetzen.")
+        out.flush()
+        try:
+            do_sync("abgebrochen")
+        except KeyboardInterrupt:
+            pass
+        os._exit(1)  # nicht auf die restlichen laufenden Anfragen warten
+    finally:
+        out.close()
+
+    if args.retry_failed:
+        # Datei neu schreiben: nur IDs behalten, die immer noch nicht klappen
+        with open(failed_file, "w", encoding="utf-8", newline="\n") as f:
+            for m in still_failed:
+                f.write(f"{m}\n")
+        log(f"{len(still_failed)} IDs sind weiterhin fehlgeschlagen")
+
+    stop_status.set()
+    status(final=True)
+    do_sync("fertig")
+    log(f"{stats['found']} Treffer in dieser Sitzung, alle Treffer: {hits_file}")
+
+
+if __name__ == "__main__":
+    main()
