@@ -151,3 +151,8 @@
 [2026-10-07 15:56:29] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
 [2026-10-07 15:56:38] [STATUS] bis ID 13'139 | 15/686'861 (0.0%) | 0.75 IDs/s (Schnitt 0.75) | Laufzeit 0m 20s | Rest ca. 254h 31m | User: 7 | Treffer: 0 | Fehler: 1 | Rate-Limits (503): 5 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x7 404x7 503x5 | Git: -
 [2026-10-07 15:56:46] [!] ID 13150 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-07 15:56:58] [STATUS] bis ID 13'159 | 25/686'861 (0.0%) | 0.50 IDs/s (Schnitt 0.62) | Laufzeit 0m 40s | Rest ca. 305h 26m | User: 8 | Treffer: 0 | Fehler: 1 | Rate-Limits (503): 10 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x8 404x16 503x10 | Git: gesichert
+[2026-10-07 15:57:18] [STATUS] bis ID 13'159 | 38/686'861 (0.0%) | 0.65 IDs/s (Schnitt 0.63) | Laufzeit 1m 00s | Rest ca. 301h 24m | User: 10 | Treffer: 0 | Fehler: 4 | Rate-Limits (503): 20 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x10 404x24 503x20 | Git: gesichert
+[2026-10-07 15:57:21] [!] ID 13164 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-07 15:57:21] [!] ID 13169 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-07 15:57:21] [!] ID 13174 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
