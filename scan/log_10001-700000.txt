@@ -1,0 +1,6 @@
+[2026-10-07 14:57:00] [git] Neuesten Stand geholt (Branch claude/epic-hamilton-0neh59)
+[2026-10-07 14:57:00] === Start auf DESKTOP-34U0VHC | Bereich 10001-700000 | Python 3.14.6 ===
+[2026-10-07 14:57:00] Scanne IDs 10001..700000 mit bis zu 2 parallelen Requests, Status und Git-Sicherung alle 30 Sekunden
+[2026-10-07 14:57:08] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
+[2026-10-07 14:57:30] [STATUS] 10'035/700'000 (0.0%) | 1.2 IDs/s (Schnitt 1.2) | Parallel: 0/2 | Laufzeit 0m 30s | Rest ca. 164h 20m (nach Schnitt) | User: 2 | Treffer: 0 | Fehler: 0 | Rate-Limits: 29 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x3 404x32 503x29 | Gespeichert bis ID 10'020 | Git: - | PAUSE noch 1s
+[2026-10-07 14:57:39] Abgebrochen bei ID 10020 - Fortschritt ist gespeichert, einfach denselben Befehl nochmal starten zum Fortsetzen.
