@@ -10,18 +10,15 @@ dem Muster "The ... Alpha" entspricht, z. B.:
 Treffer landen in einer CSV-Datei (id, name, profil-url).
 Nur Python-Standardbibliothek, keine Installation noetig.
 
-Die API-URL wird mit --url angegeben, {id} wird durch die User-ID ersetzt.
-Zuerst mit --test pruefen, ob die URL stimmt und der Name gefunden wird:
+Standardmaessig wird die GoBattle-Profil-API abgefragt
+(https://alpha.gobattle.io/api.php/api/profile/{id}, Name steht in user.nick).
 
-    python gb_alpha_scan.py --url "https://beispiel.org/api/user/{id}" --test 12345
-
-Dann der richtige Lauf:
-    python gb_alpha_scan.py --url "https://beispiel.org/api/user/{id}"
-    python gb_alpha_scan.py --url ... --name-field data.username  # Namensfeld selbst angeben
-    python gb_alpha_scan.py --url ... --workers 100               # hoechstens 100 parallel
-    python gb_alpha_scan.py --url ... --status-interval 10        # Status alle 10 statt 30 Sekunden
-    python gb_alpha_scan.py --url ... --start 1 --end 50000       # Teilbereich
-    python gb_alpha_scan.py --url ... --strict                    # nur Name beginnt mit "The" und endet mit "Alpha"
+    python alpha_scan.py --test 12345           # nur eine ID abfragen und Antwort zeigen
+    python alpha_scan.py                        # IDs 1..700000 scannen
+    python alpha_scan.py --workers 100          # hoechstens 100 parallel
+    python alpha_scan.py --status-interval 10   # Status alle 10 statt 30 Sekunden
+    python alpha_scan.py --start 1 --end 50000  # Teilbereich
+    python alpha_scan.py --strict               # nur Name beginnt mit "The" und endet mit "Alpha"
 
 Die Zahl paralleler Requests passt sich automatisch an: Bei Rate-Limits (429)
 wird sie halbiert, solange alles klappt, steigt sie langsam bis --workers.
@@ -283,14 +280,17 @@ def run_test(member_id, timeout):
         print(f"\n[OK] Gefundener Name: {name!r}")
     else:
         print("\n[!] Kein Name gefunden. Schau oben, wo der Name steht, und gib ihn mit --name-field an "
-              "(z. B. --name-field data.username).")
+              "(z. B. --name-field user.nick).")
 
 
 def main():
     p = argparse.ArgumentParser(description="Sucht User mit 'The ... Alpha' im Namen.")
-    p.add_argument("--url", required=True, help='API-URL mit {id}, z. B. "https://beispiel.org/api/user/{id}"')
-    p.add_argument("--name-field", help="Pfad zum Namen im JSON, z. B. data.username (Standard: automatisch)")
-    p.add_argument("--profile-url", default="", help="optionale Profil-URL mit {id} fuer die CSV")
+    p.add_argument("--url", default="https://alpha.gobattle.io/api.php/api/profile/{id}",
+                   help="API-URL mit {id} (Standard: GoBattle-Profil-API)")
+    p.add_argument("--name-field", default="user.nick",
+                   help="Pfad zum Namen im JSON (Standard: user.nick, 'auto' = automatisch suchen)")
+    p.add_argument("--profile-url", default="https://selahgb.org/search.html?id={id}",
+                   help="Profil-Link mit {id} fuer die CSV")
     p.add_argument("--test", type=int, metavar="ID", help="nur diese eine ID abfragen und die Antwort zeigen")
     p.add_argument("--start", type=int, default=1)
     p.add_argument("--end", type=int, default=700_000)
@@ -310,7 +310,7 @@ def main():
     u = urlsplit(args.url)
     API_SCHEME, API_HOST = u.scheme or "https", u.netloc
     API_PATH = (u.path or "/") + (f"?{u.query}" if u.query else "")
-    NAME_FIELD = args.name_field
+    NAME_FIELD = None if args.name_field == "auto" else args.name_field
     limiter = Limiter(args.start_workers, args.workers)
 
     if args.test is not None:
