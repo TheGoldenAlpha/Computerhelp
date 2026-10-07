@@ -162,3 +162,8 @@
 [2026-10-07 15:57:54] [!] ID 13195 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
 [2026-10-07 15:57:59] [STATUS] bis ID 13'199 | 60/686'861 (0.0%) | 0.55 IDs/s (Schnitt 0.60) | Laufzeit 1m 40s | Rest ca. 318h 09m | User: 16 | Treffer: 0 | Fehler: 7 | Rate-Limits (503): 33 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x16 404x37 503x33 | Git: gesichert
 [2026-10-07 15:57:59] Abgebrochen bei ID 13199 - Fortschritt ist gespeichert, einfach denselben Befehl nochmal starten zum Fortsetzen.
+[2026-10-07 15:59:00] [git] Neuesten Stand geholt (Branch claude/epic-hamilton-0neh59)
+[2026-10-07 15:59:00] === Start (einfache Version) auf DESKTOP-34U0VHC | Bereich 1-700000 | Python 3.14.6 ===
+[2026-10-07 15:59:00] Setze fort ab ID 13200 (letzte gespeicherte ID: 13199)
+[2026-10-07 15:59:00] Scanne 686'801 IDs ab 13200 mit 2 parallelen Anfragen (Platzhalter-Abstand 1.5s), Status und Git-Sicherung alle 30 Sekunden
+[2026-10-07 15:59:30] [STATUS] bis ID 13'199 | 19/686'801 (0.0%) | 0.63 IDs/s (Schnitt 0.63) | Laufzeit 0m 30s | Rest ca. 301h 20m | User: 5 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x5 404x14 | Git: -
