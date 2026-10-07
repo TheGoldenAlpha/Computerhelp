@@ -127,13 +127,13 @@ _first_429_seen = threading.Event()
 
 
 def _report_first_429(resp):
-    """Beim ersten 429 einmal zeigen, was der Server zum Limit sagt (hilft beim Einstellen)."""
+    """Beim ersten Rate-Limit einmal zeigen, was der Server zum Limit sagt (hilft beim Einstellen)."""
     if _first_429_seen.is_set():
         return
     _first_429_seen.set()
     info = [f"{k}: {v}" for k, v in resp.getheaders()
             if k.lower() == "retry-after" or "ratelimit" in k.lower() or "rate-limit" in k.lower()]
-    sys.stdout.write("[i] Erstes Rate-Limit (429). Header vom Server: "
+    sys.stdout.write(f"[i] Erstes Rate-Limit (HTTP {resp.status}). Header vom Server: "
                      + (", ".join(info) or "keine Limit-Angaben") + "\n")
 
 
@@ -228,15 +228,16 @@ def fetch_name(member_id, timeout, max_retries):
         try:
             resp, body = _request(path, headers, timeout)
             _count_code(resp.status)
-            if resp.status == 429:
-                # Rate-Limits zaehlen nicht als Fehlversuch, nur mit grosszuegiger Obergrenze
+            if resp.status in (429, 503):
+                # GoBattle meldet sein Rate-Limit mit 503 statt 429.
+                # Rate-Limits zaehlen nicht als Fehlversuch: drosseln, warten, dieselbe ID nochmal.
                 limiter.rate_limited()
                 retry_after = resp.getheader("Retry-After")
                 _report_first_429(resp)
                 _reset_conn()  # nach 429 frische Verbindung, falls der Server die alte haengen laesst
                 _pause_all(float(retry_after) if retry_after and retry_after.isdigit() else 1.0)
                 rate_limit_retries += 1
-                if rate_limit_retries > 50:
+                if rate_limit_retries > 1000:
                     raise RuntimeError("zu viele Rate-Limits")
                 continue
             if resp.status == 200:
