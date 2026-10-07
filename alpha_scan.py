@@ -63,6 +63,13 @@ _pause_lock = threading.Lock()
 _pause_until = 0.0
 _rate_limited = 0
 _net_retries = 0  # Timeouts / abgebrochene Verbindungen, die wiederholt werden
+_codes = {}  # HTTP-Statuscodes der Antworten, zur Diagnose im Status
+_codes_lock = threading.Lock()
+
+
+def _count_code(code):
+    with _codes_lock:
+        _codes[code] = _codes.get(code, 0) + 1
 
 
 class Limiter:
@@ -213,13 +220,14 @@ def fetch_name(member_id, timeout, max_retries):
     """Gibt den Namen zurueck, None wenn es die ID nicht gibt."""
     path = API_PATH.replace("{id}", str(member_id))
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-    delay = 2.0
+    delay = 1.0
     attempt = 0
     rate_limit_retries = 0
     while True:
         _wait_if_paused()
         try:
             resp, body = _request(path, headers, timeout)
+            _count_code(resp.status)
             if resp.status == 429:
                 # Rate-Limits zaehlen nicht als Fehlversuch, nur mit grosszuegiger Obergrenze
                 limiter.rate_limited()
@@ -233,23 +241,30 @@ def fetch_name(member_id, timeout, max_retries):
                 continue
             if resp.status == 200:
                 limiter.success()
-                return extract_name(json.loads(body.decode("utf-8", "replace")))
-            if resp.status in (404, 410):
+                try:
+                    data = json.loads(body.decode("utf-8", "replace"))
+                except json.JSONDecodeError:
+                    return None  # kein JSON = kein Profil, nicht wiederholen
+                return extract_name(data)
+            if 400 <= resp.status < 500:
                 limiter.success()
                 return None  # ID existiert nicht / geloescht
-            if resp.status in (500, 502, 503, 504) and attempt < max_retries:
+            # 5xx: kurz einmal wiederholen, nicht ewig warten
+            # (manche APIs antworten auf nicht existierende IDs mit 500)
+            if resp.status >= 500 and attempt < max_retries:
                 attempt += 1
                 time.sleep(delay)
-                delay = min(delay * 2, 60)
+                delay = min(delay * 2, 10)
                 continue
+            limiter.success()
             return None
-        except (http.client.HTTPException, OSError, json.JSONDecodeError):
+        except (http.client.HTTPException, OSError):
             _reset_conn()
             _count_net_retry()
             if attempt < max_retries:
                 attempt += 1
                 time.sleep(delay)
-                delay = min(delay * 2, 60)
+                delay = min(delay * 2, 10)
                 continue
             raise
 
@@ -300,7 +315,7 @@ def main():
     p.add_argument("--out", default="alpha_users.csv")
     p.add_argument("--strict", action="store_true", help="nur 'The ... Alpha' ohne etwas davor/danach")
     p.add_argument("--timeout", type=float, default=15)
-    p.add_argument("--retries", type=int, default=5)
+    p.add_argument("--retries", type=int, default=1, help="Wiederholungen bei Serverfehlern (Standard: 1)")
     p.add_argument("--chunk", type=int, default=5000, help="IDs pro Block (Fortschritt wird pro Block gespeichert)")
     args = p.parse_args()
 
@@ -385,7 +400,9 @@ def main():
               f"Laufzeit {fmt_duration(elapsed)} | Rest ca. {eta_txt} | "
               f"User: {stats['exists']:,} | Treffer: {stats['found']} | "
               f"Fehler: {stats['errors']} | Rate-Limits: {_rate_limited} | "
-              f"Timeouts/Verbindungsfehler: {_net_retries}{pause_txt}".replace(",", "'"),
+              f"Timeouts/Verbindungsfehler: {_net_retries} | "
+              f"HTTP: {' '.join(f'{k}x{v}' for k, v in sorted(_codes.items())) or '-'}"
+              f"{pause_txt}".replace(",", "'"),
               flush=True)
 
     stop_status = threading.Event()
