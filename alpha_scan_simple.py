@@ -4,7 +4,9 @@ alpha_scan_simple.py – einfache Version des GoBattle-Scans (ohne automatische 
 ================================================================================================
 
 Dieses Script sucht alle GoBattle-Spieler, deren Name zum Muster "The ... Alpha" passt.
-Es ist die EINFACHE Variante von alpha_scan.py:
+Es ist die EINFACHE Variante von alpha_scan.py. Die Anfragen laufen über die Bibliothek "requests"
+(einmal installieren:  pip install requests). Jeder Thread hat seine eigene requests.Session:
+siehe _session() weiter unten.
 
 * Es passt sein Tempo NICHT selbst an das Rate-Limit an.
 * Das Rate-Limit baust DU selbst ein, an genau zwei Stellen (siehe unten):
@@ -53,18 +55,20 @@ Ablauf im Überblick (wo passiert was?)
 
 import argparse
 import csv
-import http.client
 import json
 import os
 import re
 import socket
-import ssl
 import subprocess
 import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlsplit
+
+try:
+    import requests
+except ImportError:
+    sys.exit("Die Bibliothek 'requests' fehlt. Einmal installieren mit:  pip install requests")
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -78,7 +82,6 @@ LOOSE_RE = re.compile(r"the.*alpha", re.IGNORECASE)
 STRICT_RE = re.compile(r"^\s*the\b.*\balpha\s*$", re.IGNORECASE)
 
 # werden in main() gesetzt
-API_SCHEME, API_HOST, API_PATH = "https", "", ""
 REQUEST_DELAY = 1.0  # Platzhalter-Abstand, nur von limit_before_request() benutzt
 MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, danach -> failed_*.txt
 
@@ -182,8 +185,7 @@ _codes = {}          # HTTP-Statuscode -> Anzahl, z. B. {200: 13, 404: 22, 503: 
 _rate_limited = 0    # Anzahl 503/429-Antworten
 _net_errors = 0      # Timeouts / abgebrochene Verbindungen
 _first_503_seen = threading.Event()
-_local = threading.local()  # pro Thread eine dauerhafte Verbindung
-_ssl_ctx = ssl.create_default_context()
+_local = threading.local()  # pro Thread eine eigene requests.Session
 
 
 def _count_code(code):
@@ -192,25 +194,29 @@ def _count_code(code):
 
 
 # =====================================================================================
-# HTTP
+# HTTP (requests)
 # =====================================================================================
-def _conn(timeout):
-    """Eine dauerhafte Verbindung pro Thread (kein neuer TLS-Handshake bei jeder Anfrage)."""
-    c = getattr(_local, "conn", None)
-    if c is None:
-        if API_SCHEME == "http":
-            c = http.client.HTTPConnection(API_HOST, timeout=timeout)
-        else:
-            c = http.client.HTTPSConnection(API_HOST, timeout=timeout, context=_ssl_ctx)
-        _local.conn = c
-    return c
+def _session():
+    """Die requests.Session DIESES Threads (wird beim ersten Aufruf angelegt).
+
+    Pro Thread gibt es eine eigene Session, weil eine Session nicht dafür gebaut ist, von mehreren
+    Threads gleichzeitig benutzt zu werden. Sie hält die Verbindung offen (Keep-Alive), das spart
+    bei jeder Anfrage den neuen TLS-Handshake.
+    Für das Rate-Limit brauchst du die Session nicht: sie ist hier nur für das Senden da."""
+    sess = getattr(_local, "session", None)
+    if sess is None:
+        sess = requests.Session()
+        sess.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
+        _local.session = sess
+    return sess
 
 
-def _reset_conn():
-    c = getattr(_local, "conn", None)
-    if c is not None:
-        c.close()
-    _local.conn = None
+def _reset_session():
+    """Session schliessen und beim nächsten Aufruf neu anlegen (nach 503 oder Verbindungsproblem)."""
+    sess = getattr(_local, "session", None)
+    if sess is not None:
+        sess.close()
+    _local.session = None
 
 
 def _get_path(data, dotted):
@@ -235,21 +241,17 @@ def fetch_name(member_id, timeout, max_retries):
     Bei einer unklaren Antwort wird eine Ausnahme geworfen: Die ID zählt dann als
     fehlgeschlagen und wird in failed_*.txt notiert (statt still als "gibt es nicht" zu gelten)."""
     global _rate_limited, _net_errors
-    path = API_PATH.replace("{id}", str(member_id))
-    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    url = API_URL.replace("{id}", str(member_id))
     tries_503 = 0
     tries_other = 0
     delay = 1.0
     while True:
         limit_before_request()                      # <<< RATE-LIMIT STELLE 1 (vor der Anfrage)
         try:
-            c = _conn(timeout)
-            c.request("GET", path, headers=headers)
-            resp = c.getresponse()
-            body = resp.read()
-        except (http.client.HTTPException, OSError):
+            resp = _session().get(url, timeout=timeout)
+        except requests.RequestException:
             # Timeout oder Verbindung abgebrochen
-            _reset_conn()
+            _reset_session()
             with _stat_lock:
                 _net_errors += 1
             if tries_other < max_retries:
@@ -259,34 +261,35 @@ def fetch_name(member_id, timeout, max_retries):
                 continue
             raise
 
-        _count_code(resp.status)
-        limit_after_response(resp.status, resp.getheaders())   # <<< RATE-LIMIT STELLE 2 (nach der Antwort)
+        status = resp.status_code
+        _count_code(status)
+        limit_after_response(status, list(resp.headers.items()))   # <<< RATE-LIMIT STELLE 2 (nach der Antwort)
 
-        if resp.status in (429, 503):
+        if status in (429, 503):
             # GoBattle meldet sein Rate-Limit mit 503. Das ist KEIN Fehler der ID: zählen,
             # beim ersten Mal die Header zeigen, dieselbe ID nochmal versuchen.
             with _stat_lock:
                 _rate_limited += 1
             if not _first_503_seen.is_set():
                 _first_503_seen.set()
-                info = ", ".join(f"{k}: {v}" for k, v in resp.getheaders()
+                info = ", ".join(f"{k}: {v}" for k, v in resp.headers.items()
                                  if k.lower() == "retry-after" or "rate" in k.lower())
-                log(f"[i] Erstes Rate-Limit (HTTP {resp.status}). Header vom Server: {info or 'keine Limit-Angaben'}")
-            _reset_conn()  # frische Verbindung, falls der Server die alte hängen lässt
+                log(f"[i] Erstes Rate-Limit (HTTP {status}). Header vom Server: {info or 'keine Limit-Angaben'}")
+            _reset_session()  # frische Verbindung, falls der Server die alte hängen lässt
             tries_503 += 1
             if tries_503 > MAX_503_RETRIES:
                 # aufgeben: die ID kommt in failed_*.txt und kann später mit --retry-failed geprüft werden
-                raise RuntimeError(f"HTTP {resp.status} (Rate-Limit), {MAX_503_RETRIES} Wiederholungen erfolglos")
+                raise RuntimeError(f"HTTP {status} (Rate-Limit), {MAX_503_RETRIES} Wiederholungen erfolglos")
             continue
 
-        if resp.status == 200:
+        if status == 200:
             try:
-                data = json.loads(body.decode("utf-8", "replace"))
-            except json.JSONDecodeError:
+                data = resp.json()
+            except ValueError:
                 raise RuntimeError("HTTP 200, aber kein JSON")
             return extract_name(data)
 
-        if resp.status in (404, 410):
+        if status in (404, 410):
             return None  # ID existiert nicht / gelöscht
 
         # alles andere (z. B. 500): kurz wiederholen, danach als fehlgeschlagen melden
@@ -295,23 +298,20 @@ def fetch_name(member_id, timeout, max_retries):
             time.sleep(delay)
             delay = min(delay * 2, 10)
             continue
-        raise RuntimeError(f"HTTP {resp.status}")
+        raise RuntimeError(f"HTTP {status}")
 
 
 def run_test(member_id, timeout):
     """Eine ID abfragen und alles zeigen (prüft URL und Namensfeld)."""
-    path = API_PATH.replace("{id}", str(member_id))
-    print(f"GET {API_SCHEME}://{API_HOST}{path}")
-    c = _conn(timeout)
-    c.request("GET", path, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    resp = c.getresponse()
-    text = resp.read().decode("utf-8", "replace")
-    print(f"HTTP {resp.status} {resp.reason}")
+    url = API_URL.replace("{id}", str(member_id))
+    print(f"GET {url}")
+    resp = _session().get(url, timeout=timeout)
+    print(f"HTTP {resp.status_code} {resp.reason}")
     print("Antwort (Anfang):")
-    print(text[:1500])
+    print(resp.text[:1500])
     try:
-        name = extract_name(json.loads(text))
-    except json.JSONDecodeError:
+        name = extract_name(resp.json())
+    except ValueError:
         print("\n[!] Antwort ist kein JSON.")
         return
     print(f"\n[OK] Gefundener Name: {name!r}" if name else "\n[!] Kein Name gefunden.")
@@ -406,7 +406,7 @@ def n(x):
 # main
 # =====================================================================================
 def main():
-    global API_SCHEME, API_HOST, API_PATH, REQUEST_DELAY, MAX_503_RETRIES
+    global API_URL, REQUEST_DELAY, MAX_503_RETRIES
     p = argparse.ArgumentParser(description="Sucht User mit 'The ... Alpha' im Namen (einfache Version).")
     p.add_argument("--test", type=int, metavar="ID", help="nur diese eine ID abfragen und die Antwort zeigen")
     p.add_argument("--start", type=int, default=1)
@@ -438,9 +438,7 @@ def main():
 
     if "{id}" not in args.url:
         p.error("--url muss {id} enthalten")
-    u = urlsplit(args.url)
-    API_SCHEME, API_HOST = u.scheme or "https", u.netloc
-    API_PATH = (u.path or "/") + (f"?{u.query}" if u.query else "")
+    API_URL = args.url
     REQUEST_DELAY = args.delay
     MAX_503_RETRIES = args.retries_503
 
