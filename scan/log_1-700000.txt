@@ -160,3 +160,5 @@
 [2026-10-07 15:57:54] [!] ID 13185 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
 [2026-10-07 15:57:54] [!] ID 13190 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
 [2026-10-07 15:57:54] [!] ID 13195 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-07 15:57:59] [STATUS] bis ID 13'199 | 60/686'861 (0.0%) | 0.55 IDs/s (Schnitt 0.60) | Laufzeit 1m 40s | Rest ca. 318h 09m | User: 16 | Treffer: 0 | Fehler: 7 | Rate-Limits (503): 33 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x16 404x37 503x33 | Git: gesichert
+[2026-10-07 15:57:59] Abgebrochen bei ID 13199 - Fortschritt ist gespeichert, einfach denselben Befehl nochmal starten zum Fortsetzen.
