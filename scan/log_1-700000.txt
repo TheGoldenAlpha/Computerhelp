@@ -37,3 +37,9 @@
 [2026-10-07 15:13:21] [STATUS] 11'826/700'000 (0.1%) | 0.5 IDs/s (Schnitt 0.5) | Parallel: 0/2 | Laufzeit 12m 00s | Rest ca. 356h 01m (nach Schnitt) | User: 98 | Treffer: 0 | Fehler: 0 | Rate-Limits: 778 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x104 404x283 503x778 | Gespeichert bis ID 11'819 | Git: gesichert | PAUSE noch 1s
 [2026-10-07 15:13:51] [STATUS] 11'839/700'000 (0.1%) | 0.4 IDs/s (Schnitt 0.5) | Parallel: 2/2 | Laufzeit 12m 30s | Rest ca. 358h 47m (nach Schnitt) | User: 101 | Treffer: 0 | Fehler: 0 | Rate-Limits: 811 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x107 404x293 503x811 | Gespeichert bis ID 11'839 | Git: gesichert
 [2026-10-07 15:14:12] Abgebrochen bei ID 11839 - Fortschritt ist gespeichert, einfach denselben Befehl nochmal starten zum Fortsetzen.
+[2026-10-07 15:15:13] [git] Neuesten Stand geholt (Branch claude/epic-hamilton-0neh59)
+[2026-10-07 15:15:13] === Start auf DESKTOP-34U0VHC | Bereich 1-700000 | Python 3.14.6 ===
+[2026-10-07 15:15:13] Setze fort ab ID 11840 (letzte gespeicherte ID: 11839)
+[2026-10-07 15:15:13] Scanne IDs 11840..700000 mit bis zu 2 parallelen Requests, Status und Git-Sicherung alle 30 Sekunden
+[2026-10-07 15:15:26] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 212.41.217.65
+[2026-10-07 15:15:43] [STATUS] 11'874/700'000 (0.0%) | 1.17 IDs/s (Schnitt 1.17) | Abstand 2.04s | Parallel: 2/2 | Laufzeit 0m 30s | Rest ca. 163h 51m (nach Schnitt) | User: 13 | Treffer: 0 | Fehler: 0 | Rate-Limits: 12 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x13 404x22 503x12 | Gespeichert bis ID 11'859 | Git: -
