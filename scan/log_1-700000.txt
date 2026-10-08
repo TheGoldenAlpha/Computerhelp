@@ -2431,3 +2431,6 @@
 [2026-10-08 11:17:25] Setze fort ab ID 50540 (letzte gespeicherte ID: 50539)
 [2026-10-08 11:17:25] Scanne 649'461 IDs ab 50540 mit 2 parallelen Anfragen (Start-Abstand 1.5s, passt sich an), Status und Git-Sicherung alle 30 Sekunden
 [2026-10-08 11:17:55] [STATUS] bis ID 50'559 | 20/649'461 (0.0%) | 0.67 IDs/s (Schnitt 0.67) | Abstand 1.50s | Laufzeit 0m 30s | Rest ca. 270h 44m | User: 3 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x3 404x17 | Git: -
+[2026-10-08 11:18:25] [STATUS] bis ID 50'579 | 40/649'461 (0.0%) | 0.67 IDs/s (Schnitt 0.67) | Abstand 1.50s | Laufzeit 1m 00s | Rest ca. 270h 42m | User: 4 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x4 404x36 | Git: -
+[2026-10-08 11:18:55] [STATUS] bis ID 50'599 | 61/649'461 (0.0%) | 0.70 IDs/s (Schnitt 0.68) | Abstand 1.46s | Laufzeit 1m 30s | Rest ca. 266h 15m | User: 7 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x7 404x54 | Git: gesichert (3.0s)
+[2026-10-08 11:19:19] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
