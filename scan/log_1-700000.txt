@@ -2426,3 +2426,8 @@
 [2026-10-08 11:16:26] [STATUS] bis ID 50'519 | 275/649'741 (0.0%) | 0.43 IDs/s (Schnitt 0.48) | Abstand 2.28s | Laufzeit 9m 30s | Rest ca. 374h 04m | User: 64 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 3 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x68 404x207 503x3 | Git: gesichert (3.1s)
 [2026-10-08 11:16:56] [STATUS] bis ID 50'539 | 288/649'741 (0.0%) | 0.43 IDs/s (Schnitt 0.48) | Abstand 2.17s | Laufzeit 10m 00s | Rest ca. 375h 58m | User: 66 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 3 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x70 404x218 503x3 | Git: gesichert (3.2s)
 [2026-10-08 11:17:14] Abgebrochen bei ID 50539 - Fortschritt ist gespeichert, einfach denselben Befehl nochmal starten zum Fortsetzen.
+[2026-10-08 11:17:25] [git] Neuesten Stand geholt (Branch claude/epic-hamilton-0neh59)
+[2026-10-08 11:17:25] === Start (einfache Version) auf DESKTOP-34U0VHC | Bereich 1-700000 | Python 3.14.6 ===
+[2026-10-08 11:17:25] Setze fort ab ID 50540 (letzte gespeicherte ID: 50539)
+[2026-10-08 11:17:25] Scanne 649'461 IDs ab 50540 mit 2 parallelen Anfragen (Start-Abstand 1.5s, passt sich an), Status und Git-Sicherung alle 30 Sekunden
+[2026-10-08 11:17:55] [STATUS] bis ID 50'559 | 20/649'461 (0.0%) | 0.67 IDs/s (Schnitt 0.67) | Abstand 1.50s | Laufzeit 0m 30s | Rest ca. 270h 44m | User: 3 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x3 404x17 | Git: -
