@@ -2181,3 +2181,10 @@
 [2026-10-08 09:26:36] [STATUS] bis ID 47'039 | 139/653'081 (0.0%) | 0.50 IDs/s (Schnitt 0.58) | Laufzeit 4m 00s | Rest ca. 313h 15m | User: 17 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 18 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x19 404x120 503x18 | Git: gesichert (3.3s)
 [2026-10-08 09:26:37] [i] --max-minutes 4 erreicht, höre sauber auf.
 [2026-10-08 09:26:37] [FERTIG] bis ID 47'059 | 140/653'081 (0.0%) | 0.55 IDs/s (Schnitt 0.58) | Laufzeit 4m 01s | Rest ca. 313h 21m | User: 17 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 18 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x19 404x121 503x18 | Git: gesichert (3.3s)
+[2026-10-08 09:26:43] 0 Treffer in dieser Sitzung, alle Treffer: C:\Users\Florian\Computerhelp\scan\alpha_users_1-700000.csv
+[2026-10-08 09:26:44] [git] Neuesten Stand geholt (Branch claude/epic-hamilton-0neh59)
+[2026-10-08 09:26:44] === Start (einfache Version) auf DESKTOP-34U0VHC | Bereich 1-700000 | Python 3.14.6 ===
+[2026-10-08 09:26:44] Setze fort ab ID 47060 (letzte gespeicherte ID: 47059)
+[2026-10-08 09:26:44] Scanne 652'941 IDs ab 47060 mit 2 parallelen Anfragen (Platzhalter-Abstand 1.4s), Status und Git-Sicherung alle 30 Sekunden
+[2026-10-08 09:27:07] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
+[2026-10-08 09:27:14] [STATUS] bis ID 47'059 | 18/652'941 (0.0%) | 0.60 IDs/s (Schnitt 0.60) | Laufzeit 0m 30s | Rest ca. 302h 26m | User: 5 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 2 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x5 404x13 503x2 | Git: -
