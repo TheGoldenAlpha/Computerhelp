@@ -82,7 +82,7 @@ LOOSE_RE = re.compile(r"the.*alpha", re.IGNORECASE)
 STRICT_RE = re.compile(r"^\s*the\b.*\balpha\s*$", re.IGNORECASE)
 
 # werden in main() gesetzt
-REQUEST_DELAY = 1.5  # Platzhalter-Abstand, nur von limit_before_request() benutzt
+REQUEST_DELAY = 1.8  # Platzhalter-Abstand, nur von limit_before_request() benutzt
 MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, danach -> failed_*.txt
 
 
@@ -438,10 +438,11 @@ def main():
     p.add_argument("--start", type=int, default=1)
     p.add_argument("--end", type=int, default=700_000)
     p.add_argument("--workers", type=int, default=2, help="parallele Anfragen (Standard: 2)")
-    p.add_argument("--delay", type=float, default=1.5,
+    p.add_argument("--delay", type=float, default=1.8,
                    help="Platzhalter-Abstand in Sekunden zwischen zwei Anfragen, nur wirksam solange "
-                        "limit_before_request() den Platzhalter enthält (Standard: 1.5, gemessen: "
-                        "1.4 = fast keine 503, 1.2 und 1.0 = viele 503)")
+                        "limit_before_request() den Platzhalter enthält (Standard: 1.8). Gemessen: "
+                        "nach den ersten ca. 2 Minuten (Schwung) liegt das Dauer-Limit bei etwa 0.5 bis 0.57 "
+                        "IDs/s; bei 1.5 und weniger kommen nur mehr 503, aber nicht mehr Antworten")
     p.add_argument("--retries-503", type=int, default=3,
                    help="so oft dieselbe ID bei HTTP 503 nochmal versucht wird (Standard: 3)")
     p.add_argument("--retries", type=int, default=3, help="Wiederholungen bei Serverfehlern/Timeouts (Standard: 3)")
