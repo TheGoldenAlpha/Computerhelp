@@ -2206,3 +2206,4 @@
 [2026-10-08 09:31:41] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
 [2026-10-08 09:31:54] [STATUS] bis ID 47'199 | 18/652'801 (0.0%) | 0.60 IDs/s (Schnitt 0.60) | Laufzeit 0m 30s | Rest ca. 302h 14m | User: 2 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 4 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x2 404x16 503x4 | Git: -
 [2026-10-08 09:32:24] [STATUS] bis ID 47'219 | 33/652'801 (0.0%) | 0.50 IDs/s (Schnitt 0.55) | Laufzeit 1m 00s | Rest ca. 329h 45m | User: 5 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 11 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x5 404x28 503x11 | Git: gesichert (3.2s)
+[2026-10-08 09:32:54] [STATUS] bis ID 47'239 | 48/652'801 (0.0%) | 0.50 IDs/s (Schnitt 0.53) | Laufzeit 1m 30s | Rest ca. 340h 04m | User: 6 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 19 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x6 404x42 503x19 | Git: gesichert (3.0s)
