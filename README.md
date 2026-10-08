@@ -67,3 +67,9 @@ Mit `--retry-failed` werden diese IDs später nochmal geprüft.
 pip install requests   # einmalig
 python alpha_scan_simple.py --delay 1.2
 ```
+
+### Automatisch starten (`start_scan.bat`)
+
+Doppelklick oder in der Eingabeaufforderung `start_scan.bat`. Die Datei holt vor jedem Start per Git die neueste
+Version, installiert `requests` falls nötig, startet `alpha_scan_simple.py` und startet es nach einem Absturz nach
+30 Sekunden automatisch neu. Bei Strg+C, bei einem Fehler, den ein Neustart nicht löst, und am Ende hält sie an.
