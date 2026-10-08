@@ -8,9 +8,8 @@ Es ist die EINFACHE Variante von alpha_scan.py. Die Anfragen laufen über die Bi
 (einmal installieren:  pip install requests). Jeder Thread hat seine eigene requests.Session:
 siehe _session() weiter unten.
 
-* Das Tempo (Abstand zwischen zwei Anfragen) steuert das Rate-Limit-Modul. Es hält das Limit von
-  GoBattle ein und wird bei 503 langsamer, siehe die Erklärung bei "RATE-LIMIT" weiter unten.
-* Das Rate-Limit sitzt an genau zwei Stellen (siehe unten):
+* Es passt sein Tempo NICHT selbst an das Rate-Limit an.
+* Das Rate-Limit baust DU selbst ein, an genau zwei Stellen (siehe unten):
       >>> STELLE 1:  limit_before_request()      (vor jeder Anfrage)
       >>> STELLE 2:  limit_after_response(...)   (nach jeder Antwort)
   Beide Stellen sind im Code mit  ##### RATE-LIMIT  markiert. Suche im Script nach "RATE-LIMIT".
@@ -84,63 +83,42 @@ LOOSE_RE = re.compile(r"the.*alpha", re.IGNORECASE)
 STRICT_RE = re.compile(r"^\s*the\b.*\balpha\s*$", re.IGNORECASE)
 
 # werden in main() gesetzt
+REQUEST_DELAY = 1.5  # Platzhalter-Abstand, nur von limit_before_request() benutzt
 MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, danach -> failed_*.txt
 
 
 # =====================================================================================
-# ##### RATE-LIMIT  –  HIER STEHT DAS LIMIT  #####
+# ##### RATE-LIMIT  –  HIER BAUST DU DAS LIMIT EIN  #####
 # =====================================================================================
 #
-# Es gibt zwei Stellen. Beide werden von JEDEM Thread aufgerufen (standardmässig 2 Threads,
-# siehe --workers). Gemeinsamer Zustand liegt in den Variablen direkt unter diesem Kommentar
-# und wird mit _limit_lock geschützt.
+# Es gibt zwei Stellen. Beide werden von JEDEM Thread aufgerufen (es laufen standardmässig
+# 2 Threads gleichzeitig, siehe --workers). Wenn du gemeinsamen Zustand brauchst (z. B. "wann
+# darf die nächste Anfrage los?"), schütze ihn mit einem Lock, wie unten im Beispiel.
 #
-# Was wir über das Limit von GoBattle wissen (gemessen, nicht offiziell):
-#   * Es gilt pro IP-Adresse (Header x-rate-limit-key). Zu schnell = HTTP 503.
-#   * Der Server schickt keine Angabe, wie viel noch erlaubt ist, und keine Wartezeit.
-#   * Es verhält sich wie ein Eimer, in den dauernd Tropfen fallen: etwa alle 1,8 bis 2 Sekunden einer
-#     (= Dauer-Limit 0.5 bis 0.57 IDs pro Sekunde), dazu ein Vorrat von ca. 15 bis 20 Anfragen.
-#     Am Anfang ist der Vorrat voll (die ersten 2 Minuten laufen schneller), dann bleibt nur die Tropfenrate.
-#   * Auf Dauer bringt es nichts, schneller zu fragen: Es kommen nur mehr 503, nicht mehr Antworten.
-#
-# Was das Limit unten tut (Abstand zwischen zwei Anfragen, passt sich selbst an):
-#   * Start mit dem Abstand --delay (1.8 s).
-#   * Jede Antwort ohne 503: Abstand 0.5 % kürzer, aber nie unter --min-delay (1.7 s).
-#     So nutzt das Script den Vorrat im Eimer und tastet sich an die Grenze heran.
-#   * Jede 503: Abstand 20 % länger (mehrere gleichzeitige 503 zählen einmal) und eine Abkühlpause
-#     von einem Abstand, damit der Eimer sich wieder füllt. Nie über --max-delay.
-#   * Das ist ein sauberes Einhalten des Limits, kein Umgehen: Das Script wird bei 503 langsamer.
+# Wie viel erlaubt ist, hast du gesehen: deine IP schafft etwa 0.5 bis 1.2 IDs pro Sekunde.
+# Der Server meldet kein "noch X übrig" und keine Wartezeit. Du musst es also selbst schätzen.
 # -------------------------------------------------------------------------------------
 
 _limit_lock = threading.Lock()
-_interval = 1.8       # aktueller Abstand zwischen zwei Anfragen in Sekunden (wird in main() gesetzt)
-_min_interval = 1.7   # kürzester erlaubter Abstand (--min-delay)
-_max_interval = 10.0  # längster erlaubter Abstand (--max-delay)
-_next_time = 0.0      # frühester Zeitpunkt (time.monotonic()), zu dem die nächste Anfrage starten darf
-_last_raise = 0.0     # wann der Abstand zuletzt wegen einer 503 verlängert wurde
-
-
-def limit_interval():
-    """Aktueller Abstand (für die Statuszeile)."""
-    return _interval
 
 
 def limit_before_request():
     """##### RATE-LIMIT STELLE 1: Wird VOR JEDER Anfrage aufgerufen.
 
     Aufgabe: warten, bis die nächste Anfrage erlaubt ist. Kehrt die Funktion zurück, geht die
-    Anfrage sofort raus.
+    Anfrage sofort raus. Hier gehört deine Logik hin, z. B.:
+      * feste Wartezeit zwischen zwei Anfragen (wie im Platzhalter unten),
+      * ein "Token-Bucket" (z. B. höchstens N Anfragen pro Sekunde, Burst erlauben),
+      * eine Pause, wenn kürzlich ein 503 kam (dafür merkst du dir in STELLE 2 einen Zeitpunkt
+        in einer globalen Variable und wartest hier, bis er vorbei ist).
 
-    Jeder Thread reserviert sich hier einen Startzeitpunkt (_next_time) und wartet bis dahin.
-    So haben alle Anfragen zusammen, egal wie viele Threads laufen, den Abstand _interval.
-    Das Warten selbst passiert ausserhalb des Locks, damit sich die Threads nicht gegenseitig bremsen."""
-    global _next_time
+    PLATZHALTER (einfach, nicht adaptiv): Es wird immer REQUEST_DELAY Sekunden gewartet, und zwar
+    für alle Threads zusammen (das Lock sorgt dafür, dass sie sich hintereinander anstellen).
+    Ergibt also etwa 1 / REQUEST_DELAY Anfragen pro Sekunde, egal wie viele Threads laufen.
+    Ändere das Tempo mit --delay oder ersetze diesen Block durch deine eigene Logik.
+    """
     with _limit_lock:
-        now = time.monotonic()
-        start = max(now, _next_time)
-        _next_time = start + _interval
-    if start > now:
-        time.sleep(start - now)
+        time.sleep(REQUEST_DELAY)
 
 
 def limit_after_response(status, headers):
@@ -149,21 +127,19 @@ def limit_after_response(status, headers):
     status:  HTTP-Statuscode (200, 404, 503, ...)
     headers: Liste von (Name, Wert), z. B. [("x-rate-limit-key", "212.41.217.65"), ...]
 
-    503 (oder 429) heisst "zu schnell": Abstand verlängern und kurz abkühlen.
-    Alles andere (200, 404, ...) heisst "durchgekommen": Abstand ganz leicht verkürzen.
-    Das Wiederholen der ID bei 503 erledigt fetch_name() selbst."""
-    global _interval, _next_time, _last_raise
-    with _limit_lock:
-        now = time.monotonic()
-        if status in (429, 503):
-            # Mehrere 503 von Anfragen, die schon unterwegs waren, zählen nur einmal
-            if now - _last_raise > _interval:
-                _interval = min(_max_interval, _interval * 1.2)
-                _last_raise = now
-            # Abkühlpause: die nächste Anfrage kommt erst nach einem vollen Abstand
-            _next_time = max(_next_time, now + _interval)
-        else:
-            _interval = max(_min_interval, _interval * 0.995)
+    Hier siehst du, ob das Limit zugeschlagen hat: status == 503 (manchmal 429) heisst
+    "zu schnell". Hier kannst du dein Tempo anpassen, z. B.:
+      * nach einem 503 einen Zeitpunkt merken, bis zu dem STELLE 1 warten soll,
+      * den Abstand vergrössern (und nach Erfolgen langsam wieder verkleinern),
+      * einen "Retry-After"-Header beachten, falls GoBattle einmal einen schickt
+        (bisher schickt es keinen).
+
+    Die Funktion darf auch selbst schlafen (time.sleep); dann wartet nur dieser Thread.
+    Das Wiederholen der ID bei 503 erledigt fetch_name() selbst, darum musst du dich hier nicht kümmern.
+
+    PLATZHALTER: tut nichts.
+    """
+    return
 
 
 # =====================================================================================
@@ -458,20 +434,16 @@ def n(x):
 # main
 # =====================================================================================
 def main():
-    global API_URL, MAX_503_RETRIES, _interval, _min_interval, _max_interval
+    global API_URL, REQUEST_DELAY, MAX_503_RETRIES
     p = argparse.ArgumentParser(description="Sucht User mit 'The ... Alpha' im Namen (einfache Version).")
     p.add_argument("--test", type=int, metavar="ID", help="nur diese eine ID abfragen und die Antwort zeigen")
     p.add_argument("--start", type=int, default=1)
     p.add_argument("--end", type=int, default=700_000)
     p.add_argument("--workers", type=int, default=2, help="parallele Anfragen (Standard: 2)")
-    p.add_argument("--delay", type=float, default=1.8,
-                   help="Start-Abstand in Sekunden zwischen zwei Anfragen (Standard: 1.8). Gemessen: nach den ersten "
-                        "ca. 2 Minuten (Vorrat) liegt das Dauer-Limit bei etwa 0.5 bis 0.57 IDs/s. Der Abstand "
-                        "passt sich danach selbst an (siehe RATE-LIMIT im Script).")
-    p.add_argument("--min-delay", type=float, default=1.7,
-                   help="kürzester Abstand, auf den das Script gehen darf (Standard: 1.7)")
-    p.add_argument("--max-delay", type=float, default=10.0,
-                   help="längster Abstand, auf den das Script nach vielen 503 gehen darf (Standard: 10)")
+    p.add_argument("--delay", type=float, default=1.5,
+                   help="fester Abstand in Sekunden zwischen zwei Anfragen, nur wirksam solange "
+                        "limit_before_request() den Platzhalter enthält (Standard: 1.5 = höchstens 0.67 IDs/s). "
+                        "Gemessen: Dauer-Limit ca. 0.5 bis 0.57 IDs/s, die ersten Minuten sind schneller (Vorrat).")
     p.add_argument("--retries-503", type=int, default=3,
                    help="so oft dieselbe ID bei HTTP 503 nochmal versucht wird (Standard: 3)")
     p.add_argument("--retries", type=int, default=3, help="Wiederholungen bei Serverfehlern/Timeouts (Standard: 3)")
@@ -499,9 +471,7 @@ def main():
     if "{id}" not in args.url:
         p.error("--url muss {id} enthalten")
     API_URL = args.url
-    _min_interval = min(args.min_delay, args.delay)
-    _max_interval = max(args.max_delay, args.delay)
-    _interval = args.delay
+    REQUEST_DELAY = args.delay
     MAX_503_RETRIES = args.retries_503
 
     if args.test is not None:
@@ -570,7 +540,7 @@ def main():
     still_failed = []  # nur für --retry-failed
 
     log(f"Scanne {n(total)} IDs ab {start_id} mit {args.workers} parallelen Anfragen "
-        f"(Start-Abstand {args.delay:g}s, passt sich an), Status und Git-Sicherung alle {args.status_interval:g} Sekunden")
+        f"(Platzhalter-Abstand {args.delay:g}s), Status und Git-Sicherung alle {args.status_interval:g} Sekunden")
 
     def check(member_id):
         """Gibt ('hit', id, name), ('fail', id, grund) oder None zurück."""
@@ -598,7 +568,7 @@ def main():
         last.update(t=now, done=done)
         eta = fmt_duration((total - done) / avg) if avg > 0 else "?"
         log(f"[{'FERTIG' if final else 'STATUS'}] bis ID {n(saved_up_to['id'])} | {done}/{n(total)} ({done / total:.1%}) | "
-            f"{rate:.2f} IDs/s (Schnitt {avg:.2f}) | Abstand {limit_interval():.2f}s | Laufzeit {fmt_duration(elapsed)} | Rest ca. {eta} | "
+            f"{rate:.2f} IDs/s (Schnitt {avg:.2f}) | Abstand {REQUEST_DELAY:g}s | Laufzeit {fmt_duration(elapsed)} | Rest ca. {eta} | "
             f"User: {n(stats['exists'])} | Treffer: {stats['found']} | Fehler: {stats['errors']} | "
             f"Rate-Limits (503): {n(_rate_limited)} | Timeouts/Verbindungsfehler: {_net_errors} | "
             f"HTTP: {' '.join(f'{k}x{n(v)}' for k, v in sorted(_codes.items())) or '-'} | Git: {sync_state['text']}")
