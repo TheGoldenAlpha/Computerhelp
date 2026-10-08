@@ -357,22 +357,33 @@ def git_pull(branch):
 
 
 def git_sync(branch, msg):
-    """Ordner scan sichern: commit, neuesten Stand holen, push."""
-    with _log_lock:  # während Git arbeitet, schreibt kein anderer Thread ins Log
-        _git("add", "scan")
-        if _git("status", "--porcelain", "--", "scan").stdout.strip():
+    """Ordner scan sichern: add, commit, push.
+
+    Normalfall (nur ein Rechner schreibt): Das geht schnell und braucht keinen Pull.
+    Nur wenn der Push abgelehnt wird (z. B. weil ein anderer Rechner neuer gepusht hat),
+    wird zuerst der neueste Stand geholt (pull --rebase) und nochmal gepusht.
+    Es werden nur *.txt und *.csv gesichert, damit nie eine halbfertige .tmp-Datei in Git landet."""
+    with _log_lock:  # kurz: währenddessen schreibt kein anderer Thread in die Dateien
+        _git("add", "--", "scan/*.txt")
+        _git("add", "--", "scan/*.csv")
+        if _git("diff", "--cached", "--quiet", "--", "scan").returncode == 1:
             r = _git("commit", "-q", "-m", msg, "--", "scan")
             if r.returncode != 0:
                 return False, "commit: " + _err(r)
-        for _ in range(3):
+    # Push ohne Lock: er fasst die Dateien im Ordner nicht an, der Scan läuft währenddessen weiter
+    r = _git("push", "-q", "origin", f"HEAD:{branch}")
+    if r.returncode == 0:
+        return True, "ok"
+    for _ in range(3):
+        with _log_lock:  # Pull mit autostash fasst die Dateien an, darum jetzt mit Lock
             r = _git("pull", "--rebase", "--autostash", "-q", "origin", branch)
             if r.returncode != 0:
                 _git("rebase", "--abort")
                 return False, "pull: " + _err(r)
-            r = _git("push", "-q", "origin", f"HEAD:{branch}")
-            if r.returncode == 0:
-                return True, "ok"
-        return False, "push: " + _err(r)
+        r = _git("push", "-q", "origin", f"HEAD:{branch}")
+        if r.returncode == 0:
+            return True, "ok"
+    return False, "push: " + _err(r)
 
 
 def read_progress(path):
@@ -553,13 +564,32 @@ def main():
 
     threading.Thread(target=status_loop, daemon=True).start()
 
-    def do_sync(reason):
+    sync_thread = {"t": None}
+
+    def do_sync(reason, wait=False):
+        """Git-Sicherung. Läuft im Hintergrund, damit der Scan dabei nicht stillsteht.
+        Mit wait=True wird auf das Ende gewartet (beim Beenden)."""
         if branch is None:
             return
-        ok, text = git_sync(branch, f"Scan {tag}: bis ID {saved_up_to['id']} ({socket.gethostname()}, {reason})")
-        sync_state["text"] = "gesichert" if ok else "FEHLER"
-        if not ok:
-            log(f"[!] Git-Sicherung fehlgeschlagen (der Scan läuft trotzdem weiter und speichert lokal): {text}")
+        t = sync_thread["t"]
+        if t is not None and t.is_alive():
+            if not wait:
+                return  # die letzte Sicherung läuft noch
+            t.join()
+        msg = f"Scan {tag}: bis ID {saved_up_to['id']} ({socket.gethostname()}, {reason})"
+
+        def work():
+            t_start = time.time()
+            ok, text = git_sync(branch, msg)
+            sync_state["text"] = f"gesichert ({time.time() - t_start:.1f}s)" if ok else "FEHLER"
+            if not ok:
+                log(f"[!] Git-Sicherung fehlgeschlagen (der Scan läuft trotzdem weiter und speichert lokal): {text}")
+
+        th = threading.Thread(target=work, daemon=True)
+        sync_thread["t"] = th
+        th.start()
+        if wait:
+            th.join()
 
     # 4. Abarbeiten in kleinen Stücken. Nach jedem Stück: Treffer schreiben, DANN Fortschritt speichern.
     last_sync = time.time()
@@ -572,24 +602,25 @@ def main():
                 results = [r for r in pool.map(check, block) if r]
                 hits = [r for r in results if r[0] == "hit"]
                 fails = [r for r in results if r[0] == "fail"]
-                for _, member_id, name in hits:
-                    writer.writerow([member_id, name, f"https://selahgb.org/search.html?id={member_id}"])
-                if hits:
-                    out.flush()
-                if fails and not args.retry_failed:
-                    with open(failed_file, "a", encoding="utf-8", newline="\n") as f:
-                        for _, member_id, _reason in fails:
-                            f.write(f"{member_id}\n")
-                still_failed.extend(m for _, m, _r in fails)
-                for _, member_id, name in hits:
-                    log(f"[+] {member_id}: {name}")
-                for _, member_id, reason in fails:
-                    log(f"[!] ID {member_id} fehlgeschlagen ({reason})")
-                stats["found"] += len(hits)
-                pos += len(block)
-                if not args.retry_failed:
-                    write_progress(progress_file, block[-1])
-                saved_up_to["id"] = block[-1]
+                with _log_lock:  # Dateien nur schreiben, wenn Git gerade nicht daran arbeitet
+                    for _, member_id, name in hits:
+                        writer.writerow([member_id, name, f"https://selahgb.org/search.html?id={member_id}"])
+                    if hits:
+                        out.flush()
+                    if fails and not args.retry_failed:
+                        with open(failed_file, "a", encoding="utf-8", newline="\n") as f:
+                            for _, member_id, _reason in fails:
+                                f.write(f"{member_id}\n")
+                    still_failed.extend(m for _, m, _r in fails)
+                    for _, member_id, name in hits:
+                        log(f"[+] {member_id}: {name}")
+                    for _, member_id, reason in fails:
+                        log(f"[!] ID {member_id} fehlgeschlagen ({reason})")
+                    stats["found"] += len(hits)
+                    pos += len(block)
+                    if not args.retry_failed:
+                        write_progress(progress_file, block[-1])
+                    saved_up_to["id"] = block[-1]
                 if time.time() - last_sync >= args.status_interval:
                     do_sync("laufend")
                     last_sync = time.time()
@@ -601,7 +632,7 @@ def main():
             f"einfach denselben Befehl nochmal starten zum Fortsetzen.")
         out.flush()
         try:
-            do_sync("abgebrochen")
+            do_sync("abgebrochen", wait=True)
         except KeyboardInterrupt:
             pass
         os._exit(1)  # nicht auf die restlichen laufenden Anfragen warten
@@ -617,7 +648,7 @@ def main():
 
     stop_status.set()
     status(final=True)
-    do_sync("fertig")
+    do_sync("fertig", wait=True)
     log(f"{stats['found']} Treffer in dieser Sitzung, alle Treffer: {hits_file}")
 
 
