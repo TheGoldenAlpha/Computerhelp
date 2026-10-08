@@ -387,18 +387,33 @@ def git_sync(branch, msg):
 
 
 def read_progress(path):
+    """Letzte gespeicherte ID. 0, wenn es die Datei noch nicht gibt.
+
+    Ist die Datei da, aber leer oder kaputt (z. B. nach einem Stromausfall), bricht das Script ab,
+    statt still bei ID 1 neu anzufangen."""
     try:
         with open(path, encoding="utf-8") as f:
-            return int(f.read().strip() or 0)
-    except (OSError, ValueError):
+            text = f.read().strip()
+    except FileNotFoundError:
         return 0
+    try:
+        return int(text)
+    except ValueError:
+        sys.exit(f"[!] Die Fortschrittsdatei {path} ist leer oder kaputt (Stromausfall?).\n"
+                 f"    Stelle die letzte gesicherte Version aus Git wieder her mit:\n"
+                 f"        git checkout -- scan\n"
+                 f"    und starte das Script danach nochmal.")
 
 
 def write_progress(path, value):
-    """Atomar schreiben (erst temporäre Datei, dann ersetzen), damit nie eine halbe Datei entsteht."""
+    """Atomar und dauerhaft schreiben: erst temporäre Datei, auf die Festplatte zwingen (fsync),
+    dann ersetzen. So bleibt nach einem Absturz oder Stromausfall die alte oder die neue Version
+    ganz erhalten, nie eine leere."""
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         f.write(f"{value}\n")
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(tmp, path)
 
 
@@ -607,6 +622,7 @@ def main():
                         writer.writerow([member_id, name, f"https://selahgb.org/search.html?id={member_id}"])
                     if hits:
                         out.flush()
+                        os.fsync(out.fileno())
                     if fails and not args.retry_failed:
                         with open(failed_file, "a", encoding="utf-8", newline="\n") as f:
                             for _, member_id, _reason in fails:
