@@ -2399,3 +2399,11 @@
 [2026-10-08 11:05:48] [STATUS] bis ID 50'239 | 111/649'861 (0.0%) | 0.47 IDs/s (Schnitt 0.53) | Abstand 2.28s | Laufzeit 3m 30s | Rest ca. 341h 34m | User: 33 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 3 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x33 404x78 503x3 | Git: gesichert (3.0s)
 [2026-10-08 11:06:18] [STATUS] bis ID 50'259 | 124/649'861 (0.0%) | 0.43 IDs/s (Schnitt 0.52) | Abstand 2.28s | Laufzeit 4m 00s | Rest ca. 349h 26m | User: 35 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 3 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x35 404x89 503x3 | Git: gesichert (3.1s)
 [2026-10-08 11:06:47] Abgebrochen bei ID 50259 - Fortschritt ist gespeichert, einfach denselben Befehl nochmal starten zum Fortsetzen.
+[2026-10-08 11:06:48] [STATUS] bis ID 50'259 | 137/649'861 (0.0%) | 0.43 IDs/s (Schnitt 0.51) | Abstand 2.28s | Laufzeit 4m 30s | Rest ca. 355h 48m | User: 40 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 3 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x40 404x97 503x3 | Git: gesichert (3.1s)
+[2026-10-08 11:06:56] [git] Neuesten Stand geholt (Branch claude/epic-hamilton-0neh59)
+[2026-10-08 11:06:56] === Start (einfache Version) auf DESKTOP-34U0VHC | Bereich 1-700000 | Python 3.14.6 ===
+[2026-10-08 11:06:56] Setze fort ab ID 50260 (letzte gespeicherte ID: 50259)
+[2026-10-08 11:06:56] Scanne 649'741 IDs ab 50260 mit 2 parallelen Anfragen (Start-Abstand 1.5s, passt sich an), Status und Git-Sicherung alle 30 Sekunden
+[2026-10-08 11:07:26] [STATUS] bis ID 50'279 | 20/649'741 (0.0%) | 0.67 IDs/s (Schnitt 0.67) | Abstand 1.50s | Laufzeit 0m 30s | Rest ca. 270h 48m | User: 6 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x6 404x14 | Git: -
+[2026-10-08 11:07:49] [i] Erstes Rate-Limit (HTTP 503). Header vom Server: x-rate-limit-key: 62.2.209.198
+[2026-10-08 11:07:56] [STATUS] bis ID 50'279 | 39/649'741 (0.0%) | 0.63 IDs/s (Schnitt 0.65) | Abstand 1.72s | Laufzeit 1m 00s | Rest ca. 277h 45m | User: 11 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 1 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x11 404x28 503x1 | Git: -
