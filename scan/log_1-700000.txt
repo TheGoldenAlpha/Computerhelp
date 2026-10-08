@@ -2215,3 +2215,9 @@
 [2026-10-08 09:35:54] [STATUS] bis ID 47'319 | 138/652'801 (0.0%) | 0.50 IDs/s (Schnitt 0.51) | Laufzeit 4m 30s | Rest ca. 354h 49m | User: 14 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 65 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x14 404x124 503x65 | Git: gesichert (3.0s)
 [2026-10-08 09:35:57] [i] --max-minutes 4 erreicht, höre sauber auf.
 [2026-10-08 09:35:57] [FERTIG] bis ID 47'339 | 140/652'801 (0.0%) | 0.65 IDs/s (Schnitt 0.51) | Laufzeit 4m 33s | Rest ca. 353h 44m | User: 14 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 66 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x14 404x126 503x66 | Git: gesichert (3.0s)
+[2026-10-08 09:36:03] 0 Treffer in dieser Sitzung, alle Treffer: C:\Users\Florian\Computerhelp\scan\alpha_users_1-700000.csv
+[2026-10-08 09:45:55] [git] Neuesten Stand geholt (Branch claude/epic-hamilton-0neh59)
+[2026-10-08 09:45:55] === Start (einfache Version) auf DESKTOP-34U0VHC | Bereich 1-700000 | Python 3.14.6 ===
+[2026-10-08 09:45:55] Setze fort ab ID 47340 (letzte gespeicherte ID: 47339)
+[2026-10-08 09:45:55] Scanne 652'661 IDs ab 47340 mit 2 parallelen Anfragen (Platzhalter-Abstand 1.5s), Status und Git-Sicherung alle 30 Sekunden
+[2026-10-08 09:46:25] [STATUS] bis ID 47'339 | 19/652'661 (0.0%) | 0.63 IDs/s (Schnitt 0.63) | Laufzeit 0m 30s | Rest ca. 286h 21m | User: 6 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x6 404x13 | Git: -
