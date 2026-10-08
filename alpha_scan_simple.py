@@ -107,7 +107,7 @@ MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, da
 #   * Gab es --probe-seconds lang (60 s) keine 503, wird der Abstand um 3 % kürzer (nie unter --min-delay).
 #     Die Wartezeit ist absichtlich lang: Ein Eimer leert sich langsam, eine zu schnelle Stufe zeigt sich
 #     erst nach Minuten. Wer zu schnell stufenweise kürzt, würde das Limit überschiessen.
-#   * Bei einer 503: Abstand 15 % länger (mehrere gleichzeitige 503 zählen einmal), eine Abkühlpause von
+#   * Bei einer 503: Abstand 5 % länger (mehrere gleichzeitige 503 zählen einmal), eine Abkühlpause von
 #     einem Abstand, und der Probe-Timer startet neu. Nie über --max-delay.
 #   * Mit --fixed wird alles abgeschaltet: fester Abstand --delay, wie in der Version vorher.
 #   * Das ist ein sauberes Einhalten des Limits, kein Umgehen: Bei 503 wird das Script langsamer.
@@ -482,7 +482,7 @@ def main():
     p.add_argument("--max-delay", type=float, default=2.2,
                    help="längster Abstand, auf den das Script nach vielen 503 gehen darf (Standard: 10)")
     p.add_argument("--probe-seconds", type=float, default=60.0,
-                   help="so viele Sekunden ohne 503, bevor der Abstand um 5 %% kürzer wird (Standard: 300)")
+                   help="so viele Sekunden ohne 503, bevor der Abstand um 3 %% kürzer wird (Standard: 60)")
     p.add_argument("--fixed", action="store_true",
                    help="Abstand nicht anpassen, immer --delay (wie die Version vorher)")
     p.add_argument("--retries-503", type=int, default=3,
