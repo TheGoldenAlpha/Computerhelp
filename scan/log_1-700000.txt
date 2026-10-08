@@ -2090,3 +2090,4 @@
 [2026-10-08 08:44:26] Setze fort ab ID 45660 (letzte gespeicherte ID: 45659)
 [2026-10-08 08:44:26] Scanne 654'341 IDs ab 45660 mit 2 parallelen Anfragen (Platzhalter-Abstand 1.5s), Status und Git-Sicherung alle 30 Sekunden
 [2026-10-08 08:44:56] [STATUS] bis ID 45'659 | 19/654'341 (0.0%) | 0.63 IDs/s (Schnitt 0.63) | Laufzeit 0m 30s | Rest ca. 287h 03m | User: 3 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x3 404x16 | Git: -
+[2026-10-08 08:45:26] [STATUS] bis ID 45'679 | 36/654'341 (0.0%) | 0.57 IDs/s (Schnitt 0.60) | Laufzeit 1m 00s | Rest ca. 303h 03m | User: 4 | Treffer: 0 | Fehler: 0 | Rate-Limits (503): 0 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x4 404x32 | Git: gesichert
