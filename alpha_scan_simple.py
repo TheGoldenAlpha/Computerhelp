@@ -104,7 +104,7 @@ MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, da
 #
 # Was das Limit unten tut (Abstand zwischen zwei Anfragen, "vorsichtig herantasten"):
 #   * Start mit dem Abstand --delay (1.5 s).
-#   * Gab es --probe-seconds lang (300 s) keine 503, wird der Abstand um 5 % kürzer (nie unter --min-delay).
+#   * Gab es --probe-seconds lang (60 s) keine 503, wird der Abstand um 3 % kürzer (nie unter --min-delay).
 #     Die Wartezeit ist absichtlich lang: Ein Eimer leert sich langsam, eine zu schnelle Stufe zeigt sich
 #     erst nach Minuten. Wer zu schnell stufenweise kürzt, würde das Limit überschiessen.
 #   * Bei einer 503: Abstand 15 % länger (mehrere gleichzeitige 503 zählen einmal), eine Abkühlpause von
@@ -116,8 +116,8 @@ MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, da
 _limit_lock = threading.Lock()
 _interval = 1.5        # aktueller Abstand zwischen zwei Anfragen in Sekunden (wird in main() gesetzt)
 _min_interval = 1.0    # kürzester erlaubter Abstand (--min-delay)
-_max_interval = 10.0   # längster erlaubter Abstand (--max-delay)
-_probe_seconds = 300.0 # so lange ohne 503, bevor der Abstand kürzer wird (--probe-seconds)
+_max_interval = 2.2    # längster erlaubter Abstand (--max-delay)
+_probe_seconds = 60.0  # so lange ohne 503, bevor der Abstand kürzer wird (--probe-seconds)
 _fixed = False         # True = nichts anpassen (--fixed)
 _next_time = 0.0       # frühester Zeitpunkt (time.monotonic()), zu dem die nächste Anfrage starten darf
 _last_change = 0.0     # wann der Abstand zuletzt geändert wurde (länger oder kürzer)
@@ -166,13 +166,13 @@ def limit_after_response(status, headers):
         if status in (429, 503):
             # Mehrere 503 von Anfragen, die schon unterwegs waren, zählen nur einmal
             if now - _last_raise > _interval:
-                _interval = min(_max_interval, _interval * 1.15)
+                _interval = min(_max_interval, _interval * 1.05)
                 _last_raise = now
                 _last_change = now
             # Abkühlpause: die nächste Anfrage kommt erst nach einem vollen Abstand
             _next_time = max(_next_time, now + _interval)
         elif now - _last_change >= _probe_seconds and _interval > _min_interval:
-            _interval = max(_min_interval, _interval * 0.95)
+            _interval = max(_min_interval, _interval * 0.97)
             _last_change = now
 
 
@@ -479,9 +479,9 @@ def main():
                         "Er passt sich selbst an, ausser mit --fixed.")
     p.add_argument("--min-delay", type=float, default=1.0,
                    help="kürzester Abstand, auf den das Script beim Herantasten gehen darf (Standard: 1.0)")
-    p.add_argument("--max-delay", type=float, default=10.0,
+    p.add_argument("--max-delay", type=float, default=2.2,
                    help="längster Abstand, auf den das Script nach vielen 503 gehen darf (Standard: 10)")
-    p.add_argument("--probe-seconds", type=float, default=300.0,
+    p.add_argument("--probe-seconds", type=float, default=60.0,
                    help="so viele Sekunden ohne 503, bevor der Abstand um 5 %% kürzer wird (Standard: 300)")
     p.add_argument("--fixed", action="store_true",
                    help="Abstand nicht anpassen, immer --delay (wie die Version vorher)")
