@@ -104,7 +104,7 @@ MAX_503_RETRIES = 3  # so oft wird dieselbe ID bei HTTP 503 nochmal versucht, da
 #
 # Was das Limit unten tut (Abstand zwischen zwei Anfragen, "vorsichtig herantasten"):
 #   * Start mit dem Abstand --delay (1.5 s).
-#   * Gab es --probe-seconds lang (60 s) keine 503, wird der Abstand um 3 % kürzer (nie unter --min-delay).
+#   * Gab es --probe-seconds lang (30 s) keine 503, wird der Abstand um 3 % kürzer (nie unter --min-delay).
 #     Die Wartezeit ist absichtlich lang: Ein Eimer leert sich langsam, eine zu schnelle Stufe zeigt sich
 #     erst nach Minuten. Wer zu schnell stufenweise kürzt, würde das Limit überschiessen.
 #   * Bei einer 503: Abstand 5 % länger (mehrere gleichzeitige 503 zählen einmal), eine Abkühlpause von
@@ -117,7 +117,7 @@ _limit_lock = threading.Lock()
 _interval = 1.5        # aktueller Abstand zwischen zwei Anfragen in Sekunden (wird in main() gesetzt)
 _min_interval = 1.0    # kürzester erlaubter Abstand (--min-delay)
 _max_interval = 2.2    # längster erlaubter Abstand (--max-delay)
-_probe_seconds = 60.0  # so lange ohne 503, bevor der Abstand kürzer wird (--probe-seconds)
+_probe_seconds = 30.0  # so lange ohne 503, bevor der Abstand kürzer wird (--probe-seconds)
 _fixed = False         # True = nichts anpassen (--fixed)
 _next_time = 0.0       # frühester Zeitpunkt (time.monotonic()), zu dem die nächste Anfrage starten darf
 _last_change = 0.0     # wann der Abstand zuletzt geändert wurde (länger oder kürzer)
@@ -481,8 +481,8 @@ def main():
                    help="kürzester Abstand, auf den das Script beim Herantasten gehen darf (Standard: 1.0)")
     p.add_argument("--max-delay", type=float, default=2.2,
                    help="längster Abstand, auf den das Script nach vielen 503 gehen darf (Standard: 10)")
-    p.add_argument("--probe-seconds", type=float, default=60.0,
-                   help="so viele Sekunden ohne 503, bevor der Abstand um 3 %% kürzer wird (Standard: 60)")
+    p.add_argument("--probe-seconds", type=float, default=30.0,
+                   help="so viele Sekunden ohne 503, bevor der Abstand um 3 %% kürzer wird (Standard: 30)")
     p.add_argument("--fixed", action="store_true",
                    help="Abstand nicht anpassen, immer --delay (wie die Version vorher)")
     p.add_argument("--retries-503", type=int, default=3,
