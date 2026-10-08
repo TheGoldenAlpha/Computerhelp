@@ -3658,3 +3658,4 @@
 [2026-10-08 21:26:07] [+] 76395: THE PHANTOM ALPHA
 [2026-10-08 21:26:11] [STATUS] bis ID 76'399 | 18281/641'881 (2.8%) | 0.50 IDs/s (Schnitt 0.71) | Abstand 1.91s | Laufzeit 7h 09m | Rest ca. 244h 18m | User: 3'514 | Treffer: 1 | Fehler: 2 | Rate-Limits (503): 271 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x3'663 404x14'616 503x271 | Git: gesichert (3.6s)
 [2026-10-08 21:26:41] [STATUS] bis ID 76'399 | 18296/641'881 (2.9%) | 0.50 IDs/s (Schnitt 0.71) | Abstand 2.00s | Laufzeit 7h 10m | Rest ca. 244h 23m | User: 3'518 | Treffer: 1 | Fehler: 2 | Rate-Limits (503): 272 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x3'668 404x14'626 503x272 | Git: gesichert (3.6s)
+[2026-10-08 21:27:11] [STATUS] bis ID 76'419 | 18311/641'881 (2.9%) | 0.50 IDs/s (Schnitt 0.71) | Abstand 1.94s | Laufzeit 7h 10m | Rest ca. 244h 27m | User: 3'521 | Treffer: 1 | Fehler: 2 | Rate-Limits (503): 272 | Timeouts/Verbindungsfehler: 0 | HTTP: 200x3'671 404x14'638 503x272 | Git: gesichert (3.1s)
