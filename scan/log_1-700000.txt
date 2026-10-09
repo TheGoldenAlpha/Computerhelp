@@ -6678,3 +6678,5 @@
 [2026-10-09 22:31:22] [STATUS] bis ID 147'379 | 89275/641'881 (13.9%) | 1.00 IDs/s (Schnitt 0.77) | Abstand 1.00s | Laufzeit 32h 14m | Rest ca. 199h 36m | User: 17'532 | Treffer: 2 | Fehler: 11 | Rate-Limits (503): 1'011 | Timeouts/Verbindungsfehler: 13 | HTTP: 200x18'238 404x71'026 503x1'011 | Git: gesichert (3.2s)
 [2026-10-09 22:31:27] [+] 147385: THEALPHADRAGON
 [2026-10-09 22:31:50] [!] ID 147415 fehlgeschlagen (HTTP 503 (Rate-Limit), 3 Wiederholungen erfolglos)
+[2026-10-09 22:31:52] [STATUS] bis ID 147'419 | 89301/641'881 (13.9%) | 0.87 IDs/s (Schnitt 0.77) | Abstand 1.28s | Laufzeit 32h 15m | Rest ca. 199h 35m | User: 17'537 | Treffer: 3 | Fehler: 12 | Rate-Limits (503): 1'016 | Timeouts/Verbindungsfehler: 13 | HTTP: 200x18'243 404x71'046 503x1'016 | Git: gesichert (3.2s)
+[2026-10-09 22:32:22] [STATUS] bis ID 147'419 | 89316/641'881 (13.9%) | 0.50 IDs/s (Schnitt 0.77) | Abstand 1.63s | Laufzeit 32h 15m | Rest ca. 199h 36m | User: 17'546 | Treffer: 3 | Fehler: 12 | Rate-Limits (503): 1'021 | Timeouts/Verbindungsfehler: 13 | HTTP: 200x18'252 404x71'052 503x1'021 | Git: gesichert (3.2s)
