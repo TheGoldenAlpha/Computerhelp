@@ -267,8 +267,8 @@ log_typen_vfibu - Liste der Protokoll-Typen (für Filter und Anzeige)
     Datenänderung
       100  Datenänderung (automatisch)
 
-INDEXE (schnelles Suchen, Begründung ausführlich in postgres\setup.txt)
-=======================================================================
+INDEXE (schnelles Suchen)
+=========================
 
 Das Programm sucht Mandant und Buchung meist mit LOWER(CAST(spalte AS varchar)) = LOWER(:wert).
 Dafür gibt es Ausdrucks-Indexe mit genau diesem Ausdruck; ein Index auf der Spalte allein würde nicht benutzt.
