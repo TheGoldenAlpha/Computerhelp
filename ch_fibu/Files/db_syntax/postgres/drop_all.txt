@@ -1,0 +1,87 @@
+-- ============================================================
+-- FIBU / vfibu  --  Datenbank komplett abraeumen (PostgreSQL)
+--
+-- Loescht ALLE Objekte, die setup.txt anlegt. Es gibt kein Undo.
+-- Reihenfolge: Views -> Tabellen mit FK -> Basistabellen
+-- Danach setup.txt laufen lassen, um neu aufzubauen.
+-- ============================================================
+
+
+-- 1) Views zuerst
+--    Beide haengen an kontenrahmen_vfibu, fibubuchung_body und
+--    fibubuchung_header. Solange sie existieren, verweigert Postgres
+--    das DROP dieser drei Tabellen.
+DROP VIEW IF EXISTS public.kontosaldo_live_vfibu;
+DROP VIEW IF EXISTS public.kontostart_vfibu;
+
+
+-- 1b) Protokoll: zuerst die Trigger-Funktionen (CASCADE nimmt die Trigger auf allen Tabellen mit), dann die Tabellen
+DROP FUNCTION IF EXISTS public.log_aenderung_vfibu() CASCADE;
+DROP FUNCTION IF EXISTS public.log_schutz_vfibu() CASCADE;
+DROP TABLE IF EXISTS public.log_vfibu;
+DROP TABLE IF EXISTS public.log_typen_vfibu;
+
+
+-- 2) Tabellen mit Foreign Key auf mandanten_vfibu
+DROP TABLE IF EXISTS public.mandant_konten_vfibu;
+DROP TABLE IF EXISTS public.waehrungen_vfibu;
+DROP TABLE IF EXISTS public.jahre;
+DROP TABLE IF EXISTS public.kostenstellen_vfibu;
+
+
+-- 3) Buchungen
+DROP TABLE IF EXISTS public.fibubuchung_body;
+DROP TABLE IF EXISTS public.fibubuchung_header;
+--    buchungen_vfibu ist alt, setup.txt legt sie nicht mehr an; bleibt hier, damit bestehende DBs sauber werden
+DROP TABLE IF EXISTS public.buchungen_vfibu;
+
+
+-- 4) Stammdaten
+DROP TABLE IF EXISTS public.kontenrahmen_vfibu;
+DROP TABLE IF EXISTS public.steuercode;
+DROP TABLE IF EXISTS public.steuerkonten_vfibu;
+--    Rechte vor den Benutzern: die Zwischentabelle verweist auf beide
+DROP TABLE IF EXISTS public.benutzer_berechtigungen_vfibu;
+DROP TABLE IF EXISTS public.berechtigungen_vfibu;
+DROP TABLE IF EXISTS public.benutzer_vfibu;
+DROP TABLE IF EXISTS public.mandanten_vfibu;
+
+
+-- 5) PLZ-Verzeichnis (~3000 Zeilen, reine Nachschlagetabelle)
+--    Diese Zeile auskommentieren, wenn die Liste stehen bleiben soll -
+--    der INSERT in setup.txt ist ohnehin idempotent (NOT EXISTS-Guard)
+--    und braucht sonst jedes Mal ein paar Sekunden.
+DROP TABLE IF EXISTS public.plz_vfibu;
+
+
+-- ============================================================
+-- Kontrolle: beide Abfragen muessen 0 Zeilen liefern
+-- ============================================================
+-- SELECT table_name FROM information_schema.tables  WHERE table_schema = 'public';
+-- SELECT table_name FROM information_schema.views   WHERE table_schema = 'public';
+
+
+-- ============================================================
+-- Notnagel, falls doch etwas haengt (z.B. eine View, die nach
+-- setup.txt von Hand dazugekommen ist): CASCADE raeumt alles mit,
+-- was auf den Tabellen aufbaut - auch Dinge, die hier nicht stehen.
+-- ============================================================
+-- DROP TABLE IF EXISTS
+--     public.mandant_konten_vfibu,
+--     public.waehrungen_vfibu,
+--     public.jahre,
+--     public.kostenstellen_vfibu,
+--     public.fibubuchung_body,
+--     public.fibubuchung_header,
+--     public.buchungen_vfibu,
+--     public.kontenrahmen_vfibu,
+--     public.steuercode,
+--     public.steuerkonten_vfibu,
+--     public.benutzer_berechtigungen_vfibu,
+--     public.berechtigungen_vfibu,
+--     public.benutzer_vfibu,
+--     public.mandanten_vfibu,
+--     public.plz_vfibu,
+--     public.log_vfibu,
+--     public.log_typen_vfibu
+-- CASCADE;

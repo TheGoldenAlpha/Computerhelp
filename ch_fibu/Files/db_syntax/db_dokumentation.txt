@@ -1,0 +1,294 @@
+﻿FIBU - Datenbank-Dokumentation (PostgreSQL)
+Stand: 06.10.2026 - Quelle: postgres\setup.txt
+
+
+MANDANTEN UND GESCHÄFTSJAHRE
+============================
+
+mandanten_vfibu - ein Mandant (Firma oder Person, deren Buchhaltung geführt wird)
+  Schlüssel: id
+  id                    uuid           Schlüssel des Mandanten
+  firstname             varchar(200)   Vorname
+  lastname              varchar(200)   Nachname
+  company_name          varchar(200)   Firmenname
+  str                   varchar(200)   Strasse
+  ort                   varchar(200)   Ort
+  plz                   varchar(20)    Postleitzahl
+  mail                  varchar(250)   E-Mail
+  tel                   varchar(50)    Telefon
+  gj_start              char(5)        Beginn der Geschäftsjahre, 4 Zeichen ttmm ohne Punkt (0107 = 1. Juli)
+  gj_first              int4           Jahr, in dem das erste Geschäftsjahr endet (jjjj)
+  is_verlaengertes_gj   boolean        erstes Geschäftsjahr ist verlängert (länger als 12 Monate)
+  verlaengertes_gj      char(5)        Beginn des verlängerten ersten Geschäftsjahres, ttmm
+  is_ch                 boolean        Adresse in der Schweiz: PLZ wird geprüft, Ort kommt aus plz_vfibu
+
+jahre - Geschäftsjahre eines Mandanten
+  Schlüssel: year + mid
+  year                  int4           Geschäftsjahr (Jahr, in dem es endet)
+  mid                   uuid           Mandant
+  closed                boolean        abgeschlossen, danach keine Buchungen mehr
+  gj_von                date           erster Tag des Geschäftsjahres
+  gj_bis                date           letzter Tag des Geschäftsjahres
+  versteuerungsart      int4           MWST: 1 = effektive Methode, 2 = Saldosteuersatz, 3 = nicht MWST-pflichtig
+  fix_von               date           Buchungen fixiert ab (leer = nichts fixiert)
+  fix_bis               date           Buchungen fixiert bis
+  Regeln: gj_bis liegt nach gj_von; die Zeiträume eines Mandanten dürfen sich nicht überschneiden.
+
+mandant_konten_vfibu - Sonderkonten pro Mandant und Jahr
+  Schlüssel: mid + year + kontoart
+  mid                   uuid           Mandant
+  year                  int4           Geschäftsjahr
+  kontoart              char(2)        UE = Übertragskonto: Gegenkonto der Saldovorträge aus dem Vorjahr
+                                       EB = Gegenkonto der Startsaldi (Eröffnung), nur Aktiv- oder Passivkonto
+                                       GV = Gewinnvortrag: steht in der Auswahlliste, wird im Code nicht benutzt
+  kontonr               varchar(10)    Kontonummer
+
+waehrungen_vfibu - Fremdwährungen pro Mandant und Jahr
+  Schlüssel: mid + year + waehrung
+  mid                   uuid           Mandant
+  year                  int4           Geschäftsjahr
+  waehrung              char(3)        Währungscode, z. B. EUR
+  kurs                  numeric(12,6)  Kurs am Ende des Geschäftsjahres (CHF für 1 Einheit), Basis der Kursdifferenzen
+  konto_diff            varchar(10)    Konto, auf das die Kursdifferenzen gebucht werden
+
+kostenstellen_vfibu - Kostenstellen pro Mandant (gelten für alle Jahre)
+  Schlüssel: mid + code
+  mid                   uuid           Mandant
+  code                  varchar(10)    Kürzel; nach dem Speichern nicht mehr änderbar, steht so in den Buchungen
+  name                  varchar(100)   Bezeichnung
+  standard              boolean        wird beim Erfassen einer Buchung vorgeschlagen; höchstens eine pro Mandant (prüft das Programm)
+  Keine Zeile = keine Kostenstellen; dann ist die Auswahl in den Buchungsfenstern unsichtbar.
+  Löschen geht nur, solange keine Buchung die Kostenstelle trägt.
+
+KONTOPLAN
+=========
+
+kontenrahmen_vfibu - Kontoplan mit Klassen, Gruppen und Konten, pro Mandant und Jahr
+  Schlüssel: id
+  id                    uuid           Schlüssel des Eintrags
+  kontonr               varchar(10)    Nummer: Klasse 1-stellig, Gruppen 2- und 3-stellig, Konten ab 4 Stellen
+  name                  varchar(200)   Bezeichnung
+  hierarchie            int4           Ebene = Länge der Nummer; ab 4 ist es ein buchbares Konto
+  parent_konto          uuid           id des übergeordneten Eintrags
+  sort_columns          int4           Reihenfolge in Kontoplan und Auswertungen
+  mandanten_id          uuid           Mandant
+  year                  int4           Geschäftsjahr (jedes Jahr hat seinen eigenen Kontoplan)
+  konto_seite           char(1)        S oder H: Seite, auf der das Konto zunimmt (Vorzeichen des Saldos)
+  uebertragsfeld        boolean        Saldo wird ins nächste Jahr vorgetragen (Saldovortrag)
+  kontotype             char(2)        AK = Aktiven, PA = Passiven, AU = Aufwand, ER = Ertrag
+  mwst_typ              char(2)        MWST-Typ; daraus wird beim Buchen der Steuercode vorgeschlagen
+                                       VN, VR, VS = Verkauf Normal-, reduzierter, Sondersatz; E0 = Export 0 %
+                                       MN, MR, MS = Material; IN, IR, IS = Investitionen (je Normal, reduziert, Sonder)
+                                       bei Steuerkonten: SV = Umsatzsteuer, SM = Vorsteuer Material, SI = Vorsteuer Investitionen
+                                       leer = ohne MWST
+  waehrung              char(3)        Fremdwährung des Kontos (leer = CHF)
+
+BUCHUNGEN
+=========
+
+fibubuchung_header - Kopf einer Buchung (ein Beleg)
+  Schlüssel: bid
+  bid                   uuid           Schlüssel der Buchung
+  belegdatum            date           Datum des Belegs
+  buchungsdatum         date           Buchungsdatum
+  erfassungsdatum       timestamp      Zeitpunkt der Erfassung (automatisch)
+  username              varchar(50)    Windows-Benutzer, der gebucht hat (noch nicht der angemeldete FIBU-Benutzer)
+  belegnummer           bigint         laufende Belegnummer pro Mandant und Jahr, beginnt bei 1001
+  externe_belegnummer   varchar(10)    externe Nummer (z. B. Rechnungsnummer); wird angezeigt, aber vom Programm nie gefüllt
+  storno_bid            numeric(20,0)  nicht benutzt
+  buchungsjahr          int4           Geschäftsjahr der Buchung
+  mid                   uuid           Mandant
+  kostenstelle          varchar(10)    code aus kostenstellen_vfibu; leer = keine Kostenstelle
+
+fibubuchung_body - Zeilen einer Buchung (Soll- und Habenseite)
+  Schlüssel: bbid
+  bbid                  uuid           Schlüssel der Zeile
+  bidheader             uuid           gehört zu fibubuchung_header.bid
+  konto                 varchar(10)    Kontonummer
+  betrag                numeric(14,2)  Betrag in CHF; die Seite steht in sollhaben
+  text                  varchar(100)   Buchungstext
+  sollhaben             char(1)        S = Soll, H = Haben
+  visible               char(1)        Art der Zeile: 1 = normale Zeile, 2 = automatische MWST-Zeile (Text "MWST - ..."),
+                                       3 = Startsaldo oder Saldovortrag
+  steuercode            varchar(10)    MWST-Code der Zeile (leer = ohne MWST)
+  pos                   int4           Position der Zeile innerhalb der Buchung
+  betrag_fw             numeric(14,2)  Betrag in Fremdwährung (nur bei Fremdwährungskonten, sonst leer)
+  kurs                  numeric(12,6)  Kurs dieser Buchung (CHF für 1 Einheit)
+
+MWST
+====
+
+steuercode - MWST-Codes pro Mandant und Jahr
+  Schlüssel: id
+  id                    int4           laufende Nummer (automatisch)
+  code                  varchar(10)    Kürzel, das beim Buchen gewählt wird
+  name                  varchar(50)    Bezeichnung
+  steuersatz            numeric(4,2)   Satz in Prozent
+  saldosteuersatz       boolean        alte Checkbox, wird nicht mehr ausgewertet
+  year                  int4           Geschäftsjahr
+  mid                   uuid           Mandant
+  steuerkonto           varchar(10)    Konto, auf das die MWST gebucht wird
+  aktiv                 boolean        Code ist beim Buchen auswählbar
+  mwst_typ              char(2)        Typ wie beim Konto (VN, MN, IN ...); muss zum Steuerkonto passen (z. B. MN zu SM)
+
+steuerkonten_vfibu - alte Vorsteuerkonten-Einstellung
+  id                    int4           laufende Nummer (automatisch)
+  mid                   uuid           Mandant
+  year                  int4           Geschäftsjahr
+  konto_nr              int4           Kontonummer
+  steuerkontentyp       char(2)        Art des Steuerkontos
+  Nur noch im Fenster "Einstellungen" (Programm-Menü) benutzt, das wegfallen soll.
+  Massgebend ist steuercode.steuerkonto.
+
+BENUTZER UND RECHTE
+===================
+
+benutzer_vfibu - Benutzer für die Anmeldung
+  Schlüssel: benutzername
+  benutzername          varchar(50)    Anmeldename; Gross/Klein spielt bei Anmeldung und Doppelprüfung keine Rolle
+  vorname               varchar(100)   Vorname
+  nachname              varchar(100)   Nachname
+  email                 varchar(250)   E-Mail
+  telefon               varchar(50)    Telefon
+  passwort_hash         varchar(100)   Passwort als bcrypt-Hash (pgcrypto), nie im Klartext
+  aktiv                 boolean        false = gesperrt, Anmeldung nicht möglich
+  erstellt              timestamp      angelegt am (automatisch)
+  Startwert: admin / 11111111 (System Administrator), wird nur in eine leere Tabelle eingefügt.
+
+berechtigungen_vfibu - Liste aller Rechte
+  Schlüssel: code
+  code                  varchar(30)    Kürzel, auf das das Programm prüft (z. B. BUCHEN)
+  bezeichnung           varchar(100)   Text für die Anzeige
+  reihenfolge           int4           Reihenfolge der Anzeige (10, 20, 30 ...)
+  Inhalt: MANDANT_ERSTELLEN, MANDANT_BEARBEITEN, GJ_ERSTELLEN, KONTOPLAN_EDITIEREN, BUCHEN,
+          BUCHUNGEN_FIXIEREN, GJ_ABSCHLIESSEN, KURSDIFFERENZEN, AUSWERTUNGEN, ADMIN (= alle Rechte)
+
+benutzer_berechtigungen_vfibu - welcher Benutzer welches Recht hat (Zwischentabelle)
+  Schlüssel: benutzername + berechtigung
+  benutzername          varchar(50)    Benutzer; Umbenennen und Löschen ziehen automatisch mit
+  berechtigung          varchar(30)    code aus berechtigungen_vfibu
+  Keine Zeile = kein Recht.
+  Startwert: admin bekommt ADMIN, solange niemand Administrator ist.
+  Das Programm prüft die Rechte im Menüband und beim Öffnen der Fenster (nach der Anmeldung geladen).
+
+PROTOKOLL (Log-Files)
+=====================
+
+log_vfibu - jede Anmeldung, Aktion und Datenänderung, nur anfügen
+  Schlüssel: id
+  id                    bigint         laufende Nummer (automatisch)
+  zeitpunkt             timestamp(6)   Zeitpunkt auf die Mikrosekunde, Uhr des DB-Servers (automatisch)
+  typ                   int4           Art des Eintrags, siehe log_typen_vfibu
+  meldung               text           was gemacht wurde, z. B. "Einzelbuchung bearbeitet, Beleg 2341: Text 'Stifte' -> 'MWST - Stifte'"
+  benutzer              varchar(50)    angemeldeter FIBU-Benutzer (leer vor der Anmeldung)
+  win_user              varchar(100)   Windows-Benutzer
+  rechner               varchar(100)   Computername
+  ip                    varchar(50)    IP-Adresse des Rechners aus Sicht der Datenbank (automatisch)
+  mandant               varchar(40)    Mandant (id): gerade gewählt bzw. von der Änderung betroffen
+  jahr                  int4           Geschäftsjahr
+  sitzung               varchar(40)    Kennung der Anmeldung (GUID); alle Einträge einer Anmeldung haben dieselbe
+  bezug                 varchar(200)   worauf sich der Eintrag bezieht, z. B. "Beleg 2341", Konto, Benutzername
+  tabelle               varchar(63)    nur Typ 100: geänderte Tabelle
+  aktion                varchar(10)    nur Typ 100: INSERT, UPDATE oder DELETE
+  alt                   jsonb          nur Typ 100: ganze Zeile vorher (UPDATE, DELETE)
+  neu                   jsonb          nur Typ 100: ganze Zeile nachher (INSERT, UPDATE)
+  Zwei Ebenen: Das Programm schreibt die Typen 1 bis 92 (gnvo_app.of_log, eigene DB-Verbindung,
+          damit Einträge auch bei Fehlern und Rollback bleiben). Die Datenbank schreibt Typ 100 selbst.
+  Typ 100: Trigger log_aenderung_vfibu (nach INSERT, UPDATE, DELETE) auf 13 Tabellen:
+          mandanten_vfibu, jahre, mandant_konten_vfibu, waehrungen_vfibu,
+          kontenrahmen_vfibu, fibubuchung_header, fibubuchung_body, steuercode,
+          steuerkonten_vfibu, benutzer_vfibu, berechtigungen_vfibu, benutzer_berechtigungen_vfibu,
+          kostenstellen_vfibu
+          meldung enthält die geänderten Felder (feld: alt -> neu); unveränderte Zeilen werden nicht protokolliert.
+          Benutzer, Windows-Benutzer, Rechner und Sitzung setzt das Programm bei der Anmeldung (set_config fibu.*).
+  Passwort-Hashes werden nie gespeichert, nur der Vermerk "Passwort geändert".
+  Nur anfügen: Trigger log_schutz_vfibu verhindert UPDATE, DELETE und TRUNCATE (Fehlermeldung).
+          drop_all.txt löscht die Tabelle trotzdem; ein DB-Administrator kann den Schutz entfernen.
+  Index auf zeitpunkt. Anzeige im Programm: Administration > Log-Files (nur ADMIN).
+
+log_typen_vfibu - Liste der Protokoll-Typen (für Filter und Anzeige)
+  Schlüssel: typ
+  typ                   int4           Nummer, wie log_vfibu.typ
+  bezeichnung           varchar(100)   Text für die Anzeige
+  gruppe                varchar(50)    Gruppe für den Filter (Sitzung, Mandant, Buchungen ...)
+  Inhalt:
+    Sitzung
+        1  Anmeldung
+        2  Anmeldung fehlgeschlagen
+        3  Abmeldung
+        4  Programm beendet
+        5  Programm gestartet
+        6  Menüband-Knopf geklickt
+    Mandant
+       10  Mandant erstellt
+       11  Mandant bearbeitet
+       12  Mandant gewählt
+       13  Kostenstellen geändert
+    Geschäftsjahr
+       20  Geschäftsjahr erstellt
+       21  Geschäftsjahr gewechselt
+       22  Geschäftsjahr abgeschlossen
+       23  Buchungen fixiert
+       24  Übertrags- oder Gegenkonto gesetzt
+       25  Saldovortrag übernommen
+    Kontoplan und MWST
+       30  Kontoplan importiert
+       31  Konto erstellt
+       32  Konto bearbeitet
+       33  Konto gelöscht
+       34  Kontoplan gelöscht
+       35  Kontoplan als Vorlage gespeichert
+       36  MWST-Codes geändert
+       37  Währung oder Kurs geändert
+    Buchungen
+       40  Buchung erfasst
+       41  Buchung bearbeitet
+       42  Buchung kopiert
+       44  Startsaldo erfasst
+       45  Kursdifferenzen gebucht
+    Ausgabe
+       50  Gedruckt
+       51  PDF erstellt
+       52  Excel-Export
+       53  Text-Export
+       54  Angesehen
+    Benutzer
+       60  Benutzer erstellt
+       61  Benutzer bearbeitet
+       62  Rechte geändert
+       63  Benutzer aktiv oder inaktiv gesetzt
+       64  Passwort geändert
+    Einstellungen
+       70  Einstellungen geändert
+    Fehler
+       90  Datenbankfehler
+       91  Programmfehler
+       92  Zugriff verweigert
+    Datenänderung
+      100  Datenänderung (automatisch)
+
+NACHSCHLAGEN
+============
+
+plz_vfibu - Schweizer Postleitzahlen, rund 3000 Einträge (Ortsauswahl beim Mandanten)
+  Schlüssel: id + plz
+  id                    int4           laufende Nummer (automatisch)
+  plz                   int4           Postleitzahl
+  name                  varchar(250)   Ort
+
+VIEWS (nur lesen, rechnen live aus den Buchungen)
+=================================================
+
+kontostart_vfibu - Startsaldo pro Konto, Mandant und Jahr
+  kontonr               varchar(10)    wie in kontenrahmen_vfibu
+  mandanten_id          uuid           wie in kontenrahmen_vfibu
+  year                  int4           wie in kontenrahmen_vfibu
+  startsaldo            numeric        Summe der Startsaldo- und Saldovortragszeilen (visible = 3)
+                                       positiv = auf der Seite des Kontos (konto_seite)
+
+kontosaldo_live_vfibu - aktueller Saldo pro Konto, Mandant und Jahr
+  kontonr               varchar(10)    wie in kontenrahmen_vfibu
+  mandanten_id          uuid           wie in kontenrahmen_vfibu
+  year                  int4           wie in kontenrahmen_vfibu
+  saldo                 numeric        Summe aller Zeilen des Jahres
+                                       positiv = auf der Seite des Kontos (konto_seite)
