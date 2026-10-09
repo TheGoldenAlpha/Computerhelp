@@ -1,5 +1,5 @@
 ﻿FIBU - Datenbank-Dokumentation (PostgreSQL)
-Stand: 06.10.2026 - Quelle: postgres\setup.txt
+Stand: 09.10.2026 - Quelle: postgres\setup.txt
 
 
 MANDANTEN UND GESCHÄFTSJAHRE
@@ -267,6 +267,32 @@ log_typen_vfibu - Liste der Protokoll-Typen (für Filter und Anzeige)
     Datenänderung
       100  Datenänderung (automatisch)
 
+INDEXE (schnelles Suchen, Begründung ausführlich in postgres\setup.txt)
+=======================================================================
+
+Das Programm sucht Mandant und Buchung meist mit LOWER(CAST(spalte AS varchar)) = LOWER(:wert).
+Dafür gibt es Ausdrucks-Indexe mit genau diesem Ausdruck; ein Index auf der Spalte allein würde nicht benutzt.
+Wer eine Abfrage ändert, muss den Ausdruck genau so schreiben (mid::text trifft den Index nicht).
+
+  fibubuchung_header_mid_text_jahr    LOWER(CAST(mid AS varchar)), buchungsjahr, belegnummer
+                                      Buchungen eines Mandanten und Jahres, nächste Belegnummer, Sortierung nach Beleg
+  fibubuchung_header_bid_text         LOWER(CAST(bid AS varchar))
+                                      einen Buchungskopf beim Bearbeiten speichern
+  fibubuchung_body_bidheader          bidheader
+                                      Zeilen zu einem Kopf (Joins, Gegenkonto im Kontoblatt, Saldovortrag entfernen)
+  fibubuchung_body_bidheader_text     LOWER(CAST(bidheader AS varchar))
+                                      Zeilen einer Buchung beim Bearbeiten, Kopieren, Löschen
+  fibubuchung_body_konto              konto, bidheader
+                                      Buchungen eines Kontos (Konto löschen, Fremdwährung bei Startsaldo/Saldovortrag)
+  kontenrahmen_vfibu_mid_text_jahr    LOWER(CAST(mandanten_id AS varchar)), year, kontonr
+                                      Kontoplan eines Mandanten und Jahres, Konto-Nachschlagen im Kontoblatt
+  kontenrahmen_vfibu_mid_jahr_konto   mandanten_id, year, kontonr
+                                      Joins mit den Views und in Bilanz, Saldovortrag, Startsaldo
+  log_vfibu_zeitpunkt                 zeitpunkt
+                                      Log-Files nach Zeitraum
+  Die übrigen Tabellen sind klein (ein paar bis ein paar hundert Zeilen), dort reicht der Primärschlüssel.
+  setup.txt läuft bei jedem Programmstart; fehlende Indexe werden dabei angelegt (IF NOT EXISTS).
+
 NACHSCHLAGEN
 ============
 
@@ -278,6 +304,10 @@ plz_vfibu - Schweizer Postleitzahlen, rund 3000 Einträge (Ortsauswahl beim Mand
 
 VIEWS (nur lesen, rechnen live aus den Buchungen)
 =================================================
+
+Beide summieren die Buchungszeilen einmal pro Konto, Mandant und Jahr (GROUP BY) und hängen die Summe per
+LEFT JOIN an den Kontoplan; Konten ohne Buchung haben 0. Früher lief pro Konto eine eigene Unterabfrage,
+das machte Bilanz und Erfolgsrechnung sehr langsam (32 s bei 1000 Buchungen, jetzt wenige ms).
 
 kontostart_vfibu - Startsaldo pro Konto, Mandant und Jahr
   kontonr               varchar(10)    wie in kontenrahmen_vfibu
