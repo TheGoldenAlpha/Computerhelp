@@ -1,0 +1,27 @@
+name: DomainCheck exe
+on:
+  push:
+    paths: ["domaincheck/**", ".github/workflows/domaincheck-exe.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyinstaller
+      - run: pyinstaller --onefile --console --name DomainCheck domaincheck/domaincheck.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DomainCheck-exe
+          path: dist/DomainCheck.exe
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: domaincheck-latest
+          name: DomainCheck (latest)
+          prerelease: true
+          files: dist/DomainCheck.exe
